@@ -16,9 +16,10 @@ std::string trim(const std::string &s) {
 }
 
 const char *Keeper::SERVER_NUM_KEY = "serverNum";
+const char *Keeper::COMPUTE_NUM_KEY = "computeNum";
 
-Keeper::Keeper(uint32_t maxServer)
-    : maxServer(maxServer), curServer(0), memc(NULL) {}
+Keeper::Keeper(bool isCompute, uint32_t maxServer)
+    : isCompute(isCompute), maxServer(maxServer), curServer(0), memc(NULL) {}
 
 Keeper::~Keeper() {
   //   listener.detach();
@@ -69,22 +70,36 @@ void Keeper::serverEnter() {
   memcached_return rc;
   uint64_t serverNum;
 
-  while (true) {
-    rc = memcached_increment(memc, SERVER_NUM_KEY, strlen(SERVER_NUM_KEY), 1,
-                             &serverNum);
-    if (rc == MEMCACHED_SUCCESS) {
-      std::string ip(getIP());
-#ifdef STATIC_ID_FROM_IP
-      myNodeID = std::atoi(ip.substr(ip.find_last_of('.') + 1).c_str()) - 1;
-#else
-      myNodeID = serverNum - 1;
-#endif
-      Debug::notifyInfo("Compute server %d start up [%s]\n", myNodeID, ip.c_str());
-      return;
+  if (isCompute) {
+    while (true) {
+      rc = memcached_increment(memc, COMPUTE_NUM_KEY, strlen(COMPUTE_NUM_KEY), 1,
+                              &serverNum);
+      if (rc == MEMCACHED_SUCCESS) {
+
+        myNodeID = serverNum - 1;
+
+        printf("I am compute server %d\n", myNodeID);
+        return;
+      }
+      fprintf(stderr, "Server %d Counld't incr value and get ID: %s, retry...\n",
+              myNodeID, memcached_strerror(memc, rc));
+      usleep(10000);
     }
-    fprintf(stderr, "Server %d Counld't incr value and get ID: %s, retry...\n",
-            myNodeID, memcached_strerror(memc, rc));
-    usleep(10000);
+  } else {
+    while (true) {
+      rc = memcached_increment(memc, SERVER_NUM_KEY, strlen(SERVER_NUM_KEY), 1,
+                              &serverNum);
+      if (rc == MEMCACHED_SUCCESS) {
+
+        myNodeID = serverNum - 1;
+
+        printf("I am memory server %d\n", myNodeID);
+        return;
+      }
+      fprintf(stderr, "Server %d Counld't incr value and get ID: %s, retry...\n",
+              myNodeID, memcached_strerror(memc, rc));
+      usleep(10000);
+    }
   }
 }
 

@@ -20,6 +20,7 @@ struct ExPerThread {
 } __attribute__((packed));
 
 struct ExchangeMeta {
+  bool isCompute;
   uint64_t dsmBase;
   uint64_t cacheBase;
   uint64_t lockBase;
@@ -71,8 +72,8 @@ protected:
 
 public:
   DSMKeeper(ThreadConnection **thCon, DirectoryConnection **dirCon, RemoteConnection *remoteCon,
-            uint32_t maxServer = 12)
-      : Keeper(maxServer), thCon(thCon), dirCon(dirCon),
+            bool isCompute, uint32_t maxServer = 12)
+      : Keeper(isCompute, maxServer), thCon(thCon), dirCon(dirCon),
         remoteCon(remoteCon) {
     initLocalMeta();
     if (!connectMemcached()) {

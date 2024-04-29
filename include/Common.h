@@ -20,7 +20,7 @@
 // Environment Config
 #define MAX_MACHINE 20
 #define MEMORY_NODE_NUM 2
-#define CPU_PHYSICAL_CORE_NUM 72  // [CONFIG]
+#define CPU_PHYSICAL_CORE_NUM 16  // [CONFIG]
 #define MAX_CORO_NUM 8
 
 #define LATENCY_WINDOWS 100000
@@ -90,7 +90,7 @@ constexpr uint64_t GB = 1024ull * MB;
 constexpr uint16_t kCacheLineSize = 64;
 
 // Remote Allocation
-constexpr uint64_t dsmSize           = 64;        // GB  [CONFIG]
+constexpr uint64_t dsmSize           = 16;        // GB  [CONFIG]
 constexpr uint64_t kChunkSize        = 16 * MB;   // B
 
 // Rdma Buffer

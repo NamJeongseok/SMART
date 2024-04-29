@@ -22,6 +22,7 @@ class Keeper {
 
 private:
   static const char *SERVER_NUM_KEY;
+  static const char *COMPUTE_NUM_KEY;
 
   uint32_t maxServer;
   uint16_t curServer;
@@ -32,6 +33,7 @@ private:
   memcached_st *memc;
 
 protected:
+  bool isCompute;
   bool connectMemcached();
   bool disconnectMemcached();
   void serverConnect();
@@ -40,7 +42,7 @@ protected:
 
 
 public:
-  Keeper(uint32_t maxServer = 12);
+  Keeper(bool isCompute, uint32_t maxServer = 12);
   ~Keeper();
 
   uint16_t getMyNodeID() const { return this->myNodeID; }

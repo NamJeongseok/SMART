@@ -114,19 +114,21 @@ void DSM::initRDMAConnection() {
 
   remoteInfo = new RemoteConnection[conf.machineNR];
 
-  for (int i = 0; i < MAX_APP_THREAD; ++i) {
-    thCon[i] =
-        new ThreadConnection(i, (void *)cache.data, cache.size * define::GB,
-                             conf.machineNR, remoteInfo);
+  if (conf.isCompute) {
+    for (int i = 0; i < MAX_APP_THREAD; ++i) {
+      thCon[i] =
+          new ThreadConnection(i, (void *)cache.data, cache.size * define::GB,
+                               conf.machineNR, remoteInfo);
+    }    
+  } else {
+    for (int i = 0; i < NR_DIRECTORY; ++i) {
+      dirCon[i] =
+          new DirectoryConnection(i, (void *)baseAddr, conf.dsmSize * define::GB,
+                                  conf.machineNR, remoteInfo);
+    }
   }
 
-  for (int i = 0; i < NR_DIRECTORY; ++i) {
-    dirCon[i] =
-        new DirectoryConnection(i, (void *)baseAddr, conf.dsmSize * define::GB,
-                                conf.machineNR, remoteInfo);
-  }
-
-  keeper = new DSMKeeper(thCon, dirCon, remoteInfo, conf.machineNR);
+  keeper = new DSMKeeper(thCon, dirCon, remoteInfo, conf.isCompute, conf.machineNR);
   myNodeID = keeper->getMyNodeID();
 }
 

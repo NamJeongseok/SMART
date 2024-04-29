@@ -13,6 +13,7 @@ public:
 class DSMConfig {
 public:
   CacheConfig cacheConfig;
+  bool     isCompute;
   uint32_t machineNR;
   uint32_t threadNR;
   uint64_t dsmSize;       // G

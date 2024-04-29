@@ -28,6 +28,7 @@ public:
   uint16_t getMyNodeID() { return myNodeID; }
   uint16_t getMyThreadID() { return thread_id; }
   uint16_t getClusterSize() { return conf.machineNR; }
+  uint16_t getComputeNR() { return conf.threadNR; }
   uint64_t getThreadTag() { return thread_tag; }
 
   // RDMA operations
@@ -166,6 +167,28 @@ public:
     memcpy(value, ret, size);
 
     return size;
+  }
+
+  /* Added for logging purpose. */
+  void set_key(const std::string &key, const std::string &value) {
+    std::string k = key + std::to_string(keeper->getMyNodeID());
+    keeper->memSet(k.c_str(), k.size(), value.c_str(), value.size());
+  }
+
+  void set_key(const std::string &key, uint64_t value) {
+    std::string k = key + std::to_string(keeper->getMyNodeID());
+    keeper->memSet(k.c_str(), k.size(), (char *)&value, sizeof(value));
+  }
+
+  void set_key(const std::string &key, double value) {
+    std::string k = key + std::to_string(keeper->getMyNodeID());
+    keeper->memSet(k.c_str(), k.size(), (char *)&value, sizeof(value));
+  }
+
+  char* get_key(const std::string &key, uint16_t node_id) {
+    std::string k = key + std::to_string(node_id);
+    char* ret = keeper->memGet(k.c_str(), k.size());
+    return ret;
   }
 
 private:
