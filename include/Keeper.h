@@ -24,6 +24,7 @@ private:
   static const char *SERVER_NUM_KEY;
   static const char *COMPUTE_NUM_KEY;
 
+  uint32_t maxCompute;
   uint32_t maxServer;
   uint16_t curServer;
   uint16_t myNodeID;
@@ -42,10 +43,11 @@ protected:
 
 
 public:
-  Keeper(bool isCompute, uint32_t maxServer = 12);
+  Keeper(bool isCompute, uint32_t maxCompute = 12, uint32_t maxServer = 12);
   ~Keeper();
 
   uint16_t getMyNodeID() const { return this->myNodeID; }
+  uint16_t getComputeNR() const { return this->maxCompute; }
   uint16_t getServerNR() const { return this->maxServer; }
   uint16_t getMyPort() const { return this->myPort; }
 

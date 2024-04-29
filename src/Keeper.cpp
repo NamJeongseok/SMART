@@ -18,7 +18,7 @@ std::string trim(const std::string &s) {
 const char *Keeper::SERVER_NUM_KEY = "serverNum";
 const char *Keeper::COMPUTE_NUM_KEY = "computeNum";
 
-Keeper::Keeper(bool isCompute, uint32_t maxServer)
+Keeper::Keeper(bool isCompute, uint32_t maxCompute, uint32_t maxServer)
     : isCompute(isCompute), maxServer(maxServer), curServer(0), memc(NULL) {}
 
 Keeper::~Keeper() {
@@ -109,25 +109,48 @@ void Keeper::serverConnect() {
   uint32_t flags;
   memcached_return rc;
 
-  while (curServer < maxServer) {
-    char *serverNumStr = memcached_get(memc, SERVER_NUM_KEY,
-                                       strlen(SERVER_NUM_KEY), &l, &flags, &rc);
-    if (rc != MEMCACHED_SUCCESS) {
-      fprintf(stderr, "Server %d Counld't get serverNum: %s, retry\n", myNodeID,
-              memcached_strerror(memc, rc));
-      continue;
-    }
-    uint32_t serverNum = atoi(serverNumStr);
-    free(serverNumStr);
-
-    // /connect server K
-    for (size_t k = curServer; k < serverNum; ++k) {
-      if (k != myNodeID) {
-        connectNode(k);
-        printf("I connect server %zu\n", k);
+  if (isCompute) {
+    while (curServer < maxServer) {
+      char *serverNumStr = memcached_get(memc, SERVER_NUM_KEY,
+                                        strlen(SERVER_NUM_KEY), &l, &flags, &rc);
+      if (rc != MEMCACHED_SUCCESS) {
+        fprintf(stderr, "Server %d Counld't get serverNum: %s, retry\n", myNodeID,
+                memcached_strerror(memc, rc));
+        continue;
       }
+      uint32_t serverNum = atoi(serverNumStr);
+      free(serverNumStr);
+
+      // /connect server K
+      for (size_t k = curServer; k < serverNum; ++k) {
+        if (k != myNodeID) {
+          connectNode(k);
+          printf("I connect memory server %zu\n", k);
+        }
+      }
+      curServer = serverNum;
     }
-    curServer = serverNum;
+  } else {
+    while (curServer < maxCompute) {
+      char *serverNumStr = memcached_get(memc, COMPUTE_NUM_KEY,
+                                        strlen(COMPUTE_NUM_KEY), &l, &flags, &rc);
+      if (rc != MEMCACHED_SUCCESS) {
+        fprintf(stderr, "Server %d Counld't get serverNum: %s, retry\n", myNodeID,
+                memcached_strerror(memc, rc));
+        continue;
+      }
+      uint32_t serverNum = atoi(serverNumStr);
+      free(serverNumStr);
+
+      // /connect server K
+      for (size_t k = curServer; k < serverNum; ++k) {
+        if (k != myNodeID) {
+          connectNode(k);
+          printf("I connect compute server %zu\n", k);
+        }
+      }
+      curServer = serverNum;
+    } 
   }
 }
 
