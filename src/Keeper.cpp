@@ -16,7 +16,7 @@ std::string trim(const std::string &s) {
 }
 
 const char *Keeper::SERVER_NUM_KEY = "serverNum";
-const char *Keeper::COMPUTE_NUM_KEY = "computeNum";
+const char *Keeper::COMPUTE_NUM_KEY = "clientNum";
 
 Keeper::Keeper(bool isCompute, uint32_t maxCompute, uint32_t maxServer)
     : isCompute(isCompute), maxServer(maxServer), curServer(0), memc(NULL) {}
@@ -110,7 +110,7 @@ void Keeper::serverConnect() {
   memcached_return rc;
 
   if (isCompute) {
-    while (curServer < maxServer) {
+    while (curServer < 1) {
       char *serverNumStr = memcached_get(memc, SERVER_NUM_KEY,
                                         strlen(SERVER_NUM_KEY), &l, &flags, &rc);
       if (rc != MEMCACHED_SUCCESS) {
@@ -123,15 +123,13 @@ void Keeper::serverConnect() {
 
       // /connect server K
       for (size_t k = curServer; k < serverNum; ++k) {
-        if (k != myNodeID) {
           connectNode(k);
           printf("I connect memory server %zu\n", k);
-        }
       }
       curServer = serverNum;
     }
   } else {
-    while (curServer < maxCompute) {
+    while (curServer < 1) {
       char *serverNumStr = memcached_get(memc, COMPUTE_NUM_KEY,
                                         strlen(COMPUTE_NUM_KEY), &l, &flags, &rc);
       if (rc != MEMCACHED_SUCCESS) {

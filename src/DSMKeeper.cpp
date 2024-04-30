@@ -108,7 +108,7 @@ void DSMKeeper::setDataFromRemote(uint16_t remoteID, ExchangeMeta *remoteMeta) {
                   &thCon[k]->ctx);
         info.appToDirAh[k][i] = ibv_create_ah(thCon[k]->ctx.pd, &ahAttr);
 
-        assert(info.appToDirAh[k][i]);
+        // assert(info.appToDirAh[k][i]);
       }
     }
   } else {

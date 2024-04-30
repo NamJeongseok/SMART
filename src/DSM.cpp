@@ -44,7 +44,7 @@ DSM::DSM(const DSMConfig &conf)
   memset((char *)cache.data, 0, cache.size * define::GB);
 
   initRDMAConnection();
-  if (myNodeID < MEMORY_NODE_NUM) {  // start memory server
+  if (!conf.isCompute) {  // start memory server
     for (int i = 0; i < NR_DIRECTORY; ++i) {
       dirAgent[i] =
           new Directory(dirCon[i], remoteInfo, MEMORY_NODE_NUM, i, myNodeID);
@@ -130,6 +130,7 @@ void DSM::initRDMAConnection() {
 
   keeper = new DSMKeeper(thCon, dirCon, remoteInfo, conf.isCompute, conf.machineNR);
   myNodeID = keeper->getMyNodeID();
+  printf("done\n");
 }
 
 void DSM::read(char *buffer, GlobalAddress gaddr, size_t size, bool signal,

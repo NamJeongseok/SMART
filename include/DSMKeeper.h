@@ -82,7 +82,9 @@ public:
     serverEnter();
     serverConnect();
     connectMySelf();
+    printf("Connected\n");
     initRouteRule();
+    printf("init!\n");
   }
 
   ~DSMKeeper() { disconnectMemcached(); }
