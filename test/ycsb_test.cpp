@@ -391,8 +391,8 @@ int main(int argc, char *argv[]) {
 
   DSMConfig config;
   assert(kNodeCount >= MEMORY_NODE_NUM);
-  config.machineNR = kNodeCount;
-  config.threadNR = kThreadCount;
+  config.memoryNR = kNodeCount;
+  config.computeNR = kThreadCount;
   dsm = DSM::getInstance(config);
   bindCore(kThreadCount * 2 + 1);
   if (rm_write_conflict) {

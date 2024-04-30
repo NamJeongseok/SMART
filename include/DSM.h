@@ -27,8 +27,8 @@ public:
 
   uint16_t getMyNodeID() { return myNodeID; }
   uint16_t getMyThreadID() { return thread_id; }
-  uint16_t getClusterSize() { return conf.machineNR; }
-  uint16_t getComputeNR() { return conf.threadNR; }
+  uint16_t getClusterSize() { return conf.memoryNR; }
+  uint16_t getComputeNR() { return conf.computeNR; }
   uint64_t getThreadTag() { return thread_tag; }
 
   // RDMA operations

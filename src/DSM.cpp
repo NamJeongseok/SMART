@@ -108,29 +108,29 @@ Key DSM::getNoComflictKey(uint64_t key_hash, uint64_t global_thread_id, uint64_t
   return keyBuffer[start + key_hash % (keySpaceSize / global_thread_num)];
 }
 
-void DSM::initRDMAConnection() {
-
-  Debug::notifyInfo("Machine NR: %d", conf.machineNR);
-
-  remoteInfo = new RemoteConnection[conf.machineNR];
-
+void DSM::initRDMAConnection() {  
   if (conf.isCompute) {
+    Debug::notifyInfo("number of memory servers : %d", conf.memoryNR);
+
+    remoteInfo = new RemoteConnection[conf.memoryNR];
     for (int i = 0; i < MAX_APP_THREAD; ++i) {
       thCon[i] =
           new ThreadConnection(i, (void *)cache.data, cache.size * define::GB,
-                               conf.machineNR, remoteInfo);
-    }    
-  } else {
+                              conf.memoryNR, remoteInfo);
+    } 
+  } else { 
+    Debug::notifyInfo("number of compute servers : %d", conf.computeNR);
+
+    remoteInfo = new RemoteConnection[conf.computeNR];
     for (int i = 0; i < NR_DIRECTORY; ++i) {
       dirCon[i] =
           new DirectoryConnection(i, (void *)baseAddr, conf.dsmSize * define::GB,
-                                  conf.machineNR, remoteInfo);
+                                  conf.computeNR, remoteInfo);
     }
   }
 
-  keeper = new DSMKeeper(thCon, dirCon, remoteInfo, conf.isCompute, conf.machineNR);
+  keeper = new DSMKeeper(thCon, dirCon, remoteInfo, conf.isCompute, conf.computeNR, conf.memoryNR);
   myNodeID = keeper->getMyNodeID();
-  printf("done\n");
 }
 
 void DSM::read(char *buffer, GlobalAddress gaddr, size_t size, bool signal,

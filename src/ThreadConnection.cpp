@@ -3,7 +3,7 @@
 #include "Connection.h"
 
 ThreadConnection::ThreadConnection(uint16_t threadID, void *cachePool,
-                                   uint64_t cacheSize, uint32_t machineNR,
+                                   uint64_t cacheSize, uint32_t memoryNR,
                                    RemoteConnection *remoteInfo)
     : threadID(threadID), remoteInfo(remoteInfo) {
   createContext(&ctx);
@@ -20,8 +20,8 @@ ThreadConnection::ThreadConnection(uint16_t threadID, void *cachePool,
 
   // dir, RC
   for (int i = 0; i < NR_DIRECTORY; ++i) {
-    data[i] = new ibv_qp *[machineNR];
-    for (size_t k = 0; k < machineNR; ++k) {
+    data[i] = new ibv_qp *[memoryNR];
+    for (size_t k = 0; k < memoryNR; ++k) {
       createQueuePair(&data[i][k], IBV_QPT_RC, cq, &ctx);
     }
   }

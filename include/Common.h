@@ -47,7 +47,7 @@
 
 
 // app thread
-#define MAX_APP_THREAD 1    // one additional thread for data statistics(main thread)  [config]
+#define MAX_APP_THREAD  2   // one additional thread for data statistics(main thread)  [config]
 #define APP_MESSAGE_NR 96
 #define POLL_CQ_MAX_CNT_ONCE 8
 

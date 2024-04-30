@@ -70,13 +70,13 @@ int main(int argc, char *argv[]) {
 
   DSMConfig config;
   config.isCompute = false;
-  config.threadNR = atoi(argv[1]);
-  config.machineNR = atoi(argv[2]);
+  config.computeNR = atoi(argv[1]);
+  config.memoryNR = atoi(argv[2]);
 
   DSM* dsm = DSM::getInstance(config);
 
   fprintf(stdout, "==================== Starting Server %u ====================\n", dsm->getMyNodeID());
-  fprintf(stdout, "[NOTICE] computeNR: %d / memoryNR: %d\n", config.machineNR, config.threadNR);
+  fprintf(stdout, "[NOTICE] computeNR: %d / memoryNR: %d\n", config.computeNR, config.memoryNR);
 
   printf("[NOTICE] Enter anything to end server\n");
   getchar();

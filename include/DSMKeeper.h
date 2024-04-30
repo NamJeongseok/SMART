@@ -72,8 +72,8 @@ protected:
 
 public:
   DSMKeeper(ThreadConnection **thCon, DirectoryConnection **dirCon, RemoteConnection *remoteCon,
-            bool isCompute, uint32_t maxServer = 12)
-      : Keeper(isCompute, maxServer), thCon(thCon), dirCon(dirCon),
+            bool isCompute, uint32_t maxCompute = 1, uint32_t maxMemory = 1)
+      : Keeper(isCompute, maxCompute, maxMemory), thCon(thCon), dirCon(dirCon),
         remoteCon(remoteCon) {
     initLocalMeta();
     if (!connectMemcached()) {

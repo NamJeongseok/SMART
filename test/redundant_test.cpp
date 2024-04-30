@@ -184,8 +184,8 @@ int main(int argc, char *argv[]) {
 
   DSMConfig config;
   assert(MEMORY_NODE_NUM == 1);
-  config.machineNR = kNodeCount;
-  config.threadNR = kThreadCount;
+  config.memoryNR = kNodeCount;
+  config.computeNR = kThreadCount;
   dsm = DSM::getInstance(config);
   dsm->registerThread();
   bindCore(kThreadCount * 2 + 1);

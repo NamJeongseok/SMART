@@ -12,6 +12,7 @@ bool modifyQPtoInit(struct ibv_qp *qp, RdmaContext *context) {
         case IBV_QPT_RC:
             attr.qp_access_flags = IBV_ACCESS_REMOTE_READ |
                                    IBV_ACCESS_REMOTE_WRITE |
+                                   IBV_ACCESS_LOCAL_WRITE |
                                    IBV_ACCESS_REMOTE_ATOMIC;
             break;
 
@@ -19,9 +20,9 @@ bool modifyQPtoInit(struct ibv_qp *qp, RdmaContext *context) {
             attr.qp_access_flags = IBV_ACCESS_REMOTE_WRITE;
             break;
 
-        case IBV_EXP_QPT_DC_INI:
-            Debug::notifyError("implement me:)");
-            break;
+        // case IBV_EXP_QPT_DC_INI:
+        //     Debug::notifyError("implement me:)");
+        //     break;
 
         default:
             Debug::notifyError("implement me:)");
