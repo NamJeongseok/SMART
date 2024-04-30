@@ -144,10 +144,8 @@ void Keeper::serverConnect() {
 
       // /connect server K
       for (size_t k = curServer; k < serverNum; ++k) {
-        if (k != myNodeID) {
           connectNode(k);
           printf("I connect compute server %zu\n", k);
-        }
       }
       curServer = serverNum;
     } 

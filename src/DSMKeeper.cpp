@@ -8,6 +8,7 @@ const char *DSMKeeper::ServerPrefix = "SPre";
 void DSMKeeper::initLocalMeta() {
   if (isCompute) {
     localMeta.cacheBase = (uint64_t)thCon[0]->cachePool;
+    localMeta.isCompute = isCompute;
 
     // per thread APP
     for (int i = 0; i < MAX_APP_THREAD; ++i) {
@@ -47,7 +48,9 @@ bool DSMKeeper::connectNode(uint16_t remoteID) {
   std::string getK = getKey(remoteID);
   ExchangeMeta *remoteMeta = (ExchangeMeta *)memGet(getK.c_str(), getK.size());
 
-  setDataFromRemote(remoteID, remoteMeta);
+  if (remoteMeta->isCompute != isCompute) {
+    setDataFromRemote(remoteID, remoteMeta);
+  }
 
   free(remoteMeta);
   return true;
@@ -94,7 +97,9 @@ void DSMKeeper::setDataFromRemote(uint16_t remoteID, ExchangeMeta *remoteMeta) {
   
     for (int i = 0; i < NR_DIRECTORY; ++i) {
       info.dsmRKey[i] = remoteMeta->dirTh[i].rKey;
+#ifdef TREE_TEST_HOCL_HANDOVER
       info.lockRKey[i] = remoteMeta->dirTh[i].lock_rkey;
+#endif
       info.dirMessageQPN[i] = remoteMeta->dirUdQpn[i];
 
       for (int k = 0; k < MAX_APP_THREAD; ++k) {
@@ -123,7 +128,9 @@ void DSMKeeper::setDataFromRemote(uint16_t remoteID, ExchangeMeta *remoteMeta) {
     }
 
     auto &info = remoteCon[remoteID];
+    info.dsmBase = remoteMeta->dsmBase;
     info.cacheBase = remoteMeta->cacheBase;
+    info.lockBase = remoteMeta->lockBase;
 
     for (int i = 0; i < MAX_APP_THREAD; ++i) {
       info.appRKey[i] = remoteMeta->appTh[i].rKey;
