@@ -108,7 +108,7 @@ void DSMKeeper::setDataFromRemote(uint16_t remoteID, ExchangeMeta *remoteMeta) {
                   &thCon[k]->ctx);
         info.appToDirAh[k][i] = ibv_create_ah(thCon[k]->ctx.pd, &ahAttr);
 
-        // assert(info.appToDirAh[k][i]);
+        assert(info.appToDirAh[k][i]);
       }
     }
   } else {
@@ -128,9 +128,7 @@ void DSMKeeper::setDataFromRemote(uint16_t remoteID, ExchangeMeta *remoteMeta) {
     }
 
     auto &info = remoteCon[remoteID];
-    info.dsmBase = remoteMeta->dsmBase;
     info.cacheBase = remoteMeta->cacheBase;
-    info.lockBase = remoteMeta->lockBase;
 
     for (int i = 0; i < MAX_APP_THREAD; ++i) {
       info.appRKey[i] = remoteMeta->appTh[i].rKey;
@@ -142,7 +140,7 @@ void DSMKeeper::setDataFromRemote(uint16_t remoteID, ExchangeMeta *remoteMeta) {
                   &dirCon[k]->ctx);
         info.dirToAppAh[k][i] = ibv_create_ah(dirCon[k]->ctx.pd, &ahAttr);
 
-        // assert(info.dirToAppAh[k][i]);
+        assert(info.dirToAppAh[k][i]);
       }
     }
   }

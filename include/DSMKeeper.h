@@ -52,11 +52,19 @@ private:
   std::vector<std::string> serverList;
 
   std::string setKey(uint16_t remoteID) {
-    return std::to_string(getMyNodeID()) + "-" + std::to_string(remoteID);
+    if (isCompute) {
+      return std::to_string(getMyNodeID()) + "C-" + std::to_string(remoteID) + "M";
+    } else {
+      return std::to_string(getMyNodeID()) + "M-" + std::to_string(remoteID) + "C";
+    }
   }
 
   std::string getKey(uint16_t remoteID) {
-    return std::to_string(remoteID) + "-" + std::to_string(getMyNodeID());
+    if (isCompute) {
+      return std::to_string(remoteID) + "M-" + std::to_string(getMyNodeID()) + "C";
+    } else {
+      return std::to_string(remoteID) + "C-" + std::to_string(getMyNodeID()) + "M";
+    }
   }
 
   void initLocalMeta();
@@ -81,10 +89,8 @@ public:
     }
     serverEnter();
     serverConnect();
-    connectMySelf();
-    printf("Connected\n");
+    // connectMySelf();
     initRouteRule();
-    printf("init!\n");
   }
 
   ~DSMKeeper() { disconnectMemcached(); }

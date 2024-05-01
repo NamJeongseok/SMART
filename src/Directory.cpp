@@ -72,13 +72,13 @@ void Directory::process_message(const RawMessage *m) {
   }
 
   case RpcType::NEW_ROOT: {
+    RawMessage *new_m = (RawMessage *)dCon->message->getSendPool();
+    new_m->type = RpcType::NEW_ROOT;
+    new_m->addr = m->addr;
+    new_m->level = m->level;    
 
-    if (g_root_level < m->level) {
-      g_root_ptr = m->addr;
-      g_root_level = m->level;
-      // if (g_root_level >= 3) {
-      //   enable_cache = true;
-      // }
+    for (int i = 0; i < machineNR; ++i) {
+      dCon->sendMessage2App(new_m, i, MAX_APP_THREAD-1);
     }
 
     break;
