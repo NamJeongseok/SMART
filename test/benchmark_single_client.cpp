@@ -46,8 +46,8 @@ int main(int argc, char *argv[]) {
 
   DSMConfig config;
   config.isCompute = true;
-  config.memoryNR = 1;
-  config.computeNR = atoi(argv[1]);
+  config.computeNR = 1;
+  config.memoryNR = atoi(argv[1]);
 
   std::string workloadPath = argv[2];
   uint64_t numKeys = atol(argv[3]);
