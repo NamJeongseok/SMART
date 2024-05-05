@@ -167,7 +167,7 @@ void DSMKeeper::barrier(const std::string &barrierKey) {
   memFetchAndAdd(key.c_str(), key.size());
   while (true) {
     uint64_t v = std::stoull(memGet(key.c_str(), key.size()));
-    if (v >= this->getComputeNR()) {
+    if (v == this->getComputeNR()) {
       return;
     }
   }
