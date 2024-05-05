@@ -110,7 +110,7 @@ void Keeper::serverConnect() {
   memcached_return rc;
 
   if (isCompute) {
-    while (curServer < 1) {
+    while (curServer < maxServer) {
       char *serverNumStr = memcached_get(memc, SERVER_NUM_KEY,
                                         strlen(SERVER_NUM_KEY), &l, &flags, &rc);
       if (rc != MEMCACHED_SUCCESS) {
@@ -129,7 +129,7 @@ void Keeper::serverConnect() {
       curServer = serverNum;
     }
   } else {
-    while (curServer < 1) {
+    while (curServer < maxCompute) {
       char *serverNumStr = memcached_get(memc, COMPUTE_NUM_KEY,
                                         strlen(COMPUTE_NUM_KEY), &l, &flags, &rc);
       if (rc != MEMCACHED_SUCCESS) {
@@ -148,6 +148,7 @@ void Keeper::serverConnect() {
       curServer = serverNum;
     } 
   }
+  printf("Server Connect Done\n");
 }
 
 void Keeper::memSet(const char *key, uint32_t klen, const char *val,

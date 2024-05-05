@@ -43,7 +43,7 @@ protected:
 
 
 public:
-  Keeper(bool isCompute, uint32_t maxCompute = 1, uint32_t maxServer = 1);
+  Keeper(bool isCompute, uint32_t maxCompute = 12, uint32_t maxServer = 12);
   ~Keeper();
 
   uint16_t getMyNodeID() const { return this->myNodeID; }

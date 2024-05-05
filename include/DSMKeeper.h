@@ -80,7 +80,7 @@ protected:
 
 public:
   DSMKeeper(ThreadConnection **thCon, DirectoryConnection **dirCon, RemoteConnection *remoteCon,
-            bool isCompute, uint32_t maxCompute = 1, uint32_t maxMemory = 1)
+            bool isCompute, uint32_t maxCompute = 12, uint32_t maxMemory = 12)
       : Keeper(isCompute, maxCompute, maxMemory), thCon(thCon), dirCon(dirCon),
         remoteCon(remoteCon) {
     initLocalMeta();
