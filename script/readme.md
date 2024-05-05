@@ -23,7 +23,8 @@ at `include/Common.h`:
 
 93 constexpr uint64_t dsmSize = <MN_size>; // Memory Node's shared memory region.
                                            // Note: You don't need this at client
-                                           //       side, so remain as small as possible.
+                                           //       side, so remain as small as possible
+                                           //       at your client node.
 
 ...
 
