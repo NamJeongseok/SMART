@@ -3,7 +3,7 @@
 #include "Connection.h"
 
 DirectoryConnection::DirectoryConnection(uint16_t dirID, void *dsmPool,
-                                         uint64_t dsmSize, uint32_t machineNR,
+                                         uint64_t dsmSize, uint32_t computeNR,
                                          RemoteConnection *remoteInfo, bool isCompute)
     : dirID(dirID), remoteInfo(remoteInfo) {
 
@@ -14,7 +14,7 @@ DirectoryConnection::DirectoryConnection(uint16_t dirID, void *dsmPool,
   message->initRecv();
   message->initSend();
 
-if (!isCompute) {
+  if (!isCompute) {
     // dsm memory
     this->dsmPool = dsmPool;
     this->dsmSize = dsmSize;
@@ -51,8 +51,8 @@ if (!isCompute) {
 
   // app, RC
   for (int i = 0; i < MAX_APP_THREAD; ++i) {
-    data2app[i] = new ibv_qp *[machineNR];
-    for (size_t k = 0; k < machineNR; ++k) {
+    data2app[i] = new ibv_qp *[computeNR];
+    for (size_t k = 0; k < computeNR; ++k) {
       createQueuePair(&data2app[i][k], IBV_QPT_RC, cq, &ctx);
     }
   }

@@ -19,6 +19,17 @@ void DSMKeeper::initLocalMeta() {
 
       localMeta.appUdQpn[i] = thCon[i]->message->getQPN();
     }
+
+    // per thread DIR
+    for (int i = 0; i < NR_DIRECTORY; ++i) {
+      localMeta.dirTh[i].lid = dirCon[i]->ctx.lid;
+      localMeta.dirTh[i].rKey = 0;
+      localMeta.dirTh[i].lock_rkey = 0;
+      memcpy((char *)localMeta.dirTh[i].gid, (char *)(&dirCon[i]->ctx.gid),
+            16 * sizeof(uint8_t));
+
+      localMeta.dirUdQpn[i] = dirCon[i]->message->getQPN();
+    }
   } else {
     localMeta.dsmBase = (uint64_t)dirCon[0]->dsmPool;
     localMeta.lockBase = (uint64_t)dirCon[0]->lockPool;
@@ -48,7 +59,7 @@ bool DSMKeeper::connectNode(uint16_t remoteID, bool toCompute) {
   std::string getK = getKey(remoteID, toCompute);
   ExchangeMeta *remoteMeta = (ExchangeMeta *)memGet(getK.c_str(), getK.size());
 
-  if (remoteMeta->isCompute != isCompute) {
+  if (remoteMeta->isCompute || isCompute) {
     setDataFromRemote(remoteID, remoteMeta);
   }
 
@@ -63,20 +74,23 @@ void DSMKeeper::setDataToRemote(uint16_t remoteID) {
       for (int k = 0; k < NR_DIRECTORY; ++k) {
         localMeta.appRcQpn2dir[i][k] = c->data[k][remoteID]->qp_num;
       }
-    
     }
-  } else {
-    for (int i = 0; i < NR_DIRECTORY; ++i) {
-      auto &c = dirCon[i];
-      for (int k = 0; k < MAX_APP_THREAD; ++k) {
-        localMeta.dirRcQpn2app[i][k] = c->data2app[k][remoteID]->qp_num;
-      }
+  }
+
+  for (int i = 0; i < NR_DIRECTORY; ++i) {
+    auto &c = dirCon[i];
+    for (int k = 0; k < MAX_APP_THREAD; ++k) {
+      localMeta.dirRcQpn2app[i][k] = c->data2app[k][remoteID]->qp_num;
     }
   }
 }
 
 void DSMKeeper::setDataFromRemote(uint16_t remoteID, ExchangeMeta *remoteMeta) {
   if (isCompute) {
+    if (remoteMeta->isCompute) {
+      remoteID += getServerNR();
+    }
+    
     for (int i = 0; i < MAX_APP_THREAD; ++i) {
       auto &c = thCon[i];
       for (int k = 0; k < NR_DIRECTORY; ++k) {
@@ -180,7 +194,7 @@ uint64_t DSMKeeper::sum(const std::string &sum_key, uint64_t value) {
   memSet(key.c_str(), key.size(), (char *)&value, sizeof(value));
 
   uint64_t ret = 0;
-  for (int i = 0; i < this->getServerNR(); ++i) {
+  for (int i = 0; i < this->getComputeNR(); ++i) {
     key = key_prefix + std::to_string(i);
     ret += *(uint64_t *)memGet(key.c_str(), key.size());
   }
