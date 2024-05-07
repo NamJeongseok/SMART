@@ -125,7 +125,7 @@ void DSM::initRDMAConnection() {
     for (int i = 0; i < NR_DIRECTORY; ++i) {
       dirCon[i] =
           new DirectoryConnection(i, (void *)baseAddr, conf.dsmSize * define::GB,
-                                  conf.computeNR, remoteInfo);
+                                  conf.computeNR, remoteInfo, true);
     }
   }
 
