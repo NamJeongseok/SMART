@@ -123,7 +123,7 @@ void Keeper::serverConnect() {
 
       // /connect server K
       for (size_t k = curServer; k < serverNum; ++k) {
-          connectNode(k);
+          connectNode(k, false);
           printf("I connect memory server %zu\n", k);
       }
       curServer = serverNum;
@@ -142,7 +142,7 @@ void Keeper::serverConnect() {
 
       // /connect server K
       for (size_t k = curServer; k < serverNum; ++k) {
-          connectNode(k);
+          connectNode(k, true);
           printf("I connect compute server %zu\n", k);
       }
       curServer = serverNum;

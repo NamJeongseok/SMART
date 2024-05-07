@@ -38,14 +38,14 @@ void DSMKeeper::initLocalMeta() {
   }
 }
 
-bool DSMKeeper::connectNode(uint16_t remoteID) {
+bool DSMKeeper::connectNode(uint16_t remoteID, bool toCompute) {
 
   setDataToRemote(remoteID);
 
-  std::string setK = setKey(remoteID);
+  std::string setK = setKey(remoteID, toCompute);
   memSet(setK.c_str(), setK.size(), (char *)(&localMeta), sizeof(localMeta));
 
-  std::string getK = getKey(remoteID);
+  std::string getK = getKey(remoteID, toCompute);
   ExchangeMeta *remoteMeta = (ExchangeMeta *)memGet(getK.c_str(), getK.size());
 
   if (remoteMeta->isCompute != isCompute) {

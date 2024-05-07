@@ -39,7 +39,7 @@ protected:
   bool disconnectMemcached();
   void serverConnect();
   void serverEnter();
-  virtual bool connectNode(uint16_t remoteID) = 0;
+  virtual bool connectNode(uint16_t remoteID, bool toCompute) = 0;
 
 
 public:
