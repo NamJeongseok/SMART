@@ -23,11 +23,13 @@ if (!isCompute) {
 
     // on-chip lock memory
     if (dirID == 0) {
+#ifdef TREE_TEST_HOCL_HANDOVER
       this->lockPool = (void *)define::kLockStartAddr;
       this->lockSize = define::kLockChipMemSize;
       this->lockMR = createMemoryRegionOnChip((uint64_t)this->lockPool,
                                               this->lockSize, &ctx);
       this->lockLKey = lockMR->lkey;
+#endif
     }
   } else {
     // dsm memory
