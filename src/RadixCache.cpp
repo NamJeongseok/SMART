@@ -245,7 +245,6 @@ void RadixCache::invalidate(volatile CacheEntry** entry_ptr_ptr, CacheEntry* ent
 
 void RadixCache::_evict() {
   bool flag;
-  while (!__sync_bool_compare_and_swap(&evict_lock, 0UL, 1UL));
   do {
     // _evict_one();
     std::pair<volatile CacheEntry**, CacheEntry*> next;
@@ -254,6 +253,7 @@ void RadixCache::_evict() {
     }
     flag = eviction_list.empty();
   } while (free_manager->remain_size() < 0 && !flag);
+  while (!__sync_bool_compare_and_swap(&evict_lock, 0UL, 1UL));
   if (flag) {
     // rebuild cache  TODO: memory leak
     if (__sync_bool_compare_and_swap(&cache_root, cache_root, new CacheNode())) {
