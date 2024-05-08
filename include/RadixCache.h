@@ -191,6 +191,7 @@ private:
   FreeMemManager* free_manager;
   CacheNode* cache_root;
   tbb::concurrent_queue<CacheNode*>* node_queue;
+  volatile bool evict_lock;
 
   // GC
   tbb::concurrent_queue<CacheEntry*> cache_entry_gc;

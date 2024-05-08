@@ -12,6 +12,7 @@ RadixCache::RadixCache(int cache_size, DSM *dsm) : cache_size(cache_size), dsm(d
   cache_root = new CacheNode();
   node_queue = new tbb::concurrent_queue<CacheNode*>();
   node_queue->push(cache_root);
+  evict_lock = false;
 }
 
 
@@ -244,6 +245,7 @@ void RadixCache::invalidate(volatile CacheEntry** entry_ptr_ptr, CacheEntry* ent
 
 void RadixCache::_evict() {
   bool flag;
+  while (!__sync_bool_compare_and_swap(&evict_lock, 0UL, 1UL));
   do {
     // _evict_one();
     std::pair<volatile CacheEntry**, CacheEntry*> next;
@@ -252,19 +254,16 @@ void RadixCache::_evict() {
     }
     flag = eviction_list.empty();
   } while (free_manager->remain_size() < 0 && !flag);
-  // if (flag) {
-  //   // rebuild cache  TODO: memory leak
-  //   if (__sync_bool_compare_and_swap(&cache_root, cache_root, new CacheNode())) {
-  //     FreeMemManager* old_manager = free_manager;
-  //     tbb::concurrent_queue<CacheNode*>* old_node_queue = node_queue;
-  //     free_manager = new FreeMemManager(define::MB * cache_size);
-  //     node_queue = new tbb::concurrent_queue<CacheNode*>();
+  if (flag) {
+    // rebuild cache  TODO: memory leak
+    if (__sync_bool_compare_and_swap(&cache_root, cache_root, new CacheNode())) {
+      free_manager = new FreeMemManager(define::MB * cache_size);
+      node_queue = new tbb::concurrent_queue<CacheNode*>();
 
-  //     delete old_manager;
-  //     delete old_node_queue;
-  //     node_queue->push(cache_root);
-  //   }
-  // }
+      node_queue->push(cache_root);
+    }
+  }
+  __sync_bool_compare_and_swap(&evict_lock, 1UL, 0UL);
 }
 
 // void RadixCache::_evict_one() {
