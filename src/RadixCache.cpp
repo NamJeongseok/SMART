@@ -255,8 +255,13 @@ void RadixCache::_evict() {
   if (flag) {
     // rebuild cache  TODO: memory leak
     if (__sync_bool_compare_and_swap(&cache_root, cache_root, new CacheNode())) {
+      FreeMemManager* old_manager = free_manager;
+      tbb::concurrent_queue<CacheNode*>* old_node_queue = node_queue;
       free_manager = new FreeMemManager(define::MB * cache_size);
       node_queue = new tbb::concurrent_queue<CacheNode*>();
+
+      delete old_manager;
+      delete old_node_queue;
       node_queue->push(cache_root);
     }
   }
