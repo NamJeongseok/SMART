@@ -3,8 +3,8 @@
 #include "Connection.h"
 
 DirectoryConnection::DirectoryConnection(uint16_t dirID, void *dsmPool,
-                                         uint64_t dsmSize, uint32_t machineNR,
-                                         RemoteConnection *remoteInfo)
+                                         uint64_t dsmSize, uint32_t computeNR,
+                                         RemoteConnection *remoteInfo, bool isCompute)
     : dirID(dirID), remoteInfo(remoteInfo) {
 
   createContext(&ctx);
@@ -14,27 +14,45 @@ DirectoryConnection::DirectoryConnection(uint16_t dirID, void *dsmPool,
   message->initRecv();
   message->initSend();
 
-  // dsm memory
-  this->dsmPool = dsmPool;
-  this->dsmSize = dsmSize;
-  this->dsmMR = createMemoryRegion((uint64_t)dsmPool, dsmSize, &ctx);
-  this->dsmLKey = dsmMR->lkey;
+  if (!isCompute) {
+    // dsm memory
+    this->dsmPool = dsmPool;
+    this->dsmSize = dsmSize;
+    this->dsmMR = createMemoryRegion((uint64_t)dsmPool, dsmSize, &ctx);
+    this->dsmLKey = dsmMR->lkey;
 
-  // on-chip lock memory
-  if (dirID == 0) {
+    // on-chip lock memory
+    if (dirID == 0) {
 #ifdef TREE_TEST_HOCL_HANDOVER
-    this->lockPool = (void *)define::kLockStartAddr;
-    this->lockSize = define::kLockChipMemSize;
-    this->lockMR = createMemoryRegionOnChip((uint64_t)this->lockPool,
-                                            this->lockSize, &ctx);
-    this->lockLKey = lockMR->lkey;
+      this->lockPool = (void *)define::kLockStartAddr;
+      this->lockSize = define::kLockChipMemSize;
+      this->lockMR = createMemoryRegionOnChip((uint64_t)this->lockPool,
+                                              this->lockSize, &ctx);
+      this->lockLKey = lockMR->lkey;
 #endif
+    }
+  } else {
+    // dsm memory
+    this->dsmPool = NULL;
+    this->dsmSize = 0;
+    this->dsmMR = NULL;
+    this->dsmLKey = 0;
+
+    // on-chip lock memory
+    if (dirID == 0) {
+#ifdef TREE_TEST_HOCL_HANDOVER
+      this->lockPool = NULL;
+      this->lockSize = 0;
+      this->lockMR = NULL;
+      this->lockLKey = 0;
+#endif
+    }
   }
 
   // app, RC
   for (int i = 0; i < MAX_APP_THREAD; ++i) {
-    data2app[i] = new ibv_qp *[machineNR];
-    for (size_t k = 0; k < machineNR; ++k) {
+    data2app[i] = new ibv_qp *[computeNR];
+    for (size_t k = 0; k < computeNR; ++k) {
       createQueuePair(&data2app[i][k], IBV_QPT_RC, cq, &ctx);
     }
   }

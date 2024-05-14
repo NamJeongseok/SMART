@@ -111,8 +111,8 @@ inline std::pair<bool, bool> LocalLockTable::acquire_local_read_lock(const Key& 
   Key* unique_key = nullptr;
   Key* new_key = new Key(k);
   bool res = node.unique_read_key.compare_exchange_strong(unique_key, new_key);
+  delete new_key;
   if (!res) {
-    delete new_key;
     if (*unique_key != k) {  // conflict keys
       return std::make_pair(false, true);
     }
@@ -203,8 +203,9 @@ inline std::pair<bool, bool> LocalLockTable::acquire_local_write_lock(const Key&
   Key* unique_key = nullptr;
   Key* new_key = new Key(k);
   bool res = node.unique_write_key.compare_exchange_strong(unique_key, new_key);
+  delete new_key;
   if (!res) {
-    delete new_key;
+    
     if (*unique_key != k) {  // conflict keys
       return std::make_pair(false, true);
     }

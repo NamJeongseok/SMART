@@ -51,19 +51,35 @@ private:
 
   std::vector<std::string> serverList;
 
-  std::string setKey(uint16_t remoteID) {
+  std::string setKey(uint16_t remoteID, bool toCompute) {
     if (isCompute) {
-      return std::to_string(getMyNodeID()) + "C-" + std::to_string(remoteID) + "M";
+      if (toCompute) {
+        return std::to_string(getMyNodeID()) + "C-" + std::to_string(remoteID) + "C";
+      } else {
+        return std::to_string(getMyNodeID()) + "C-" + std::to_string(remoteID) + "M";
+      }
     } else {
-      return std::to_string(getMyNodeID()) + "M-" + std::to_string(remoteID) + "C";
+      if (toCompute) {
+        return std::to_string(getMyNodeID()) + "M-" + std::to_string(remoteID) + "C";
+      } else {
+        return std::to_string(getMyNodeID()) + "M-" + std::to_string(remoteID) + "M";
+      }
     }
   }
 
-  std::string getKey(uint16_t remoteID) {
+  std::string getKey(uint16_t remoteID, bool toCompute) {
     if (isCompute) {
-      return std::to_string(remoteID) + "M-" + std::to_string(getMyNodeID()) + "C";
+      if (toCompute) {
+        return std::to_string(remoteID) + "C-" + std::to_string(getMyNodeID()) + "C";
+      } else {
+        return std::to_string(remoteID) + "M-" + std::to_string(getMyNodeID()) + "C";
+      }
     } else {
-      return std::to_string(remoteID) + "C-" + std::to_string(getMyNodeID()) + "M";
+      if (toCompute) {
+        return std::to_string(remoteID) + "C-" + std::to_string(getMyNodeID()) + "M";
+      } else {
+        return std::to_string(remoteID) + "M-" + std::to_string(getMyNodeID()) + "M";
+      }
     }
   }
 
@@ -76,7 +92,7 @@ private:
   void setDataFromRemote(uint16_t remoteID, ExchangeMeta *remoteMeta);
 
 protected:
-  virtual bool connectNode(uint16_t remoteID) override;
+  virtual bool connectNode(uint16_t remoteID, bool toCompute) override;
 
 public:
   DSMKeeper(ThreadConnection **thCon, DirectoryConnection **dirCon, RemoteConnection *remoteCon,

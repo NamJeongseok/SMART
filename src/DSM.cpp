@@ -108,17 +108,23 @@ Key DSM::getNoComflictKey(uint64_t key_hash, uint64_t global_thread_id, uint64_t
   return keyBuffer[start + key_hash % (keySpaceSize / global_thread_num)];
 }
 
-void DSM::initRDMAConnection() {  
+void DSM::initRDMAConnection() {
   if (conf.isCompute) {
-    Debug::notifyInfo("number of memory servers : %d", conf.memoryNR);
+    Debug::notifyInfo("number of total servers : %d", conf.memoryNR + conf.computeNR);
 
-    remoteInfo = new RemoteConnection[conf.memoryNR];
+    remoteInfo = new RemoteConnection[conf.memoryNR + conf.computeNR];
     for (int i = 0; i < MAX_APP_THREAD; ++i) {
       thCon[i] =
           new ThreadConnection(i, (void *)cache.data, cache.size * define::GB,
-                              conf.memoryNR, remoteInfo);
+                              conf.memoryNR + conf.computeNR, remoteInfo);
     } 
-  } else { 
+
+    for (int i = 0; i < NR_DIRECTORY; ++i) {
+      dirCon[i] =
+          new DirectoryConnection(i, (void *)baseAddr, conf.dsmSize * define::GB,
+                                  conf.computeNR, remoteInfo, true);
+    }
+  } else {
     Debug::notifyInfo("number of compute servers : %d", conf.computeNR);
 
     remoteInfo = new RemoteConnection[conf.computeNR];

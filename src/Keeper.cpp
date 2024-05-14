@@ -1,6 +1,5 @@
 #include "Keeper.h"
 #include <fstream>
-#include <string>
 #include <iostream>
 #include <random>
 
@@ -19,7 +18,7 @@ const char *Keeper::SERVER_NUM_KEY = "serverNum";
 const char *Keeper::COMPUTE_NUM_KEY = "clientNum";
 
 Keeper::Keeper(bool isCompute, uint32_t maxCompute, uint32_t maxServer)
-    : isCompute(isCompute), maxServer(maxServer), curServer(0), memc(NULL) {}
+    : isCompute(isCompute), maxServer(maxServer), maxCompute(maxCompute), curServer(0), memc(NULL) {}
 
 Keeper::~Keeper() {
   //   listener.detach();
@@ -123,34 +122,34 @@ void Keeper::serverConnect() {
 
       // /connect server K
       for (size_t k = curServer; k < serverNum; ++k) {
-          connectNode(k);
+          connectNode(k, false);
           printf("I connect memory server %zu\n", k);
       }
       curServer = serverNum;
     }
-  } else {
-    while (curServer < maxCompute) {
-      char *serverNumStr = memcached_get(memc, COMPUTE_NUM_KEY,
-                                        strlen(COMPUTE_NUM_KEY), &l, &flags, &rc);
-      if (rc != MEMCACHED_SUCCESS) {
-        fprintf(stderr, "Server %d Counld't get serverNum: %s, retry\n", myNodeID,
-                memcached_strerror(memc, rc));
-        continue;
-      }
-      uint32_t serverNum = atoi(serverNumStr);
-      free(serverNumStr);
+  }
 
-      // /connect server K
-      for (size_t k = curServer; k < serverNum; ++k) {
-          connectNode(k);
-          printf("I connect compute server %zu\n", k);
-      }
-      curServer = serverNum;
+  curServer = 0;
+  while (curServer < maxCompute) {
+    char *serverNumStr = memcached_get(memc, COMPUTE_NUM_KEY,
+                                      strlen(COMPUTE_NUM_KEY), &l, &flags, &rc);
+    if (rc != MEMCACHED_SUCCESS) {
+      fprintf(stderr, "Server %d Counld't get serverNum: %s, retry\n", myNodeID,
+              memcached_strerror(memc, rc));
+      continue;
+    }
+    uint32_t serverNum = atoi(serverNumStr);
+    free(serverNumStr);
+
+    // /connect server K
+    for (size_t k = curServer; k < serverNum; ++k) {
+        connectNode(k, true);
+        printf("I connect compute server %zu\n", k);
+    }
+    curServer = serverNum;
     } 
   }
-  printf("Server Connect Done\n");
-}
-
+  
 void Keeper::memSet(const char *key, uint32_t klen, const char *val,
                     uint32_t vlen) {
 
@@ -177,7 +176,7 @@ char *Keeper::memGet(const char *key, uint32_t klen, size_t *v_size) {
     if (rc == MEMCACHED_SUCCESS) {
       break;
     }
-    usleep(40 * myNodeID);
+    usleep(400 * myNodeID);
   }
 
   if (v_size != nullptr) {
@@ -194,6 +193,6 @@ uint64_t Keeper::memFetchAndAdd(const char *key, uint32_t klen) {
     if (rc == MEMCACHED_SUCCESS) {
       return res;
     }
-    usleep(400 * myNodeID);
+    usleep(10000);
   }
 }
