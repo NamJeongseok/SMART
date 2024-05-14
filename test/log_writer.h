@@ -70,12 +70,11 @@ public:
     fprintf(fpt, "============================================================\n");
   }
 
-  void LOG_client_info(string bench_type, uint64_t thread_num, string workload_path, uint64_t num_keys, int leaf_capacity, uint64_t leaf_size) {
+  void LOG_client_info(string bench_type, uint64_t thread_num, string workload_path, uint64_t num_keys) {
     fprintf(fpt, "==================== Client Information ====================\n");
     fprintf(fpt, "Type: %s (%lu threads)\n", bench_type.c_str(), thread_num);
     fprintf(fpt, "Workload: %s\n", workload_path.c_str());
     fprintf(fpt, "Number of keys: %lu\n", num_keys);
-    fprintf(fpt, "Keys per bucket: %d (%luB)\n", leaf_capacity, leaf_size);
     fprintf(fpt, "============================================================\n");
   }
 };

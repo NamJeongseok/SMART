@@ -20,7 +20,7 @@
 // Environment Config
 #define MAX_MACHINE 20
 #define MEMORY_NODE_NUM 1
-#define CPU_PHYSICAL_CORE_NUM 16  // [CONFIG]
+#define CPU_PHYSICAL_CORE_NUM 64  // [CONFIG]
 #define MAX_CORO_NUM 1
 
 #define LATENCY_WINDOWS 100000
@@ -47,7 +47,7 @@
 
 
 // app thread
-#define MAX_APP_THREAD  2   // one additional thread for data statistics(main thread)  [config]
+#define MAX_APP_THREAD 65   // one additional thread for data statistics(main thread)  [config]
 #define APP_MESSAGE_NR 96
 #define POLL_CQ_MAX_CNT_ONCE 8
 
@@ -99,7 +99,7 @@ constexpr int64_t kPerThreadRdmaBuf  = rdmaBufferSize * define::GB / MAX_APP_THR
 constexpr int64_t kPerCoroRdmaBuf    = kPerThreadRdmaBuf / MAX_CORO_NUM;
 
 // Cache (MB)
-constexpr int kIndexCacheSize = 600;
+constexpr int kIndexCacheSize = 1024;
 
 // KV
 constexpr uint32_t keyLen = 8;

@@ -1,6 +1,7 @@
 #include "Timer.h"
 #include "Tree.h"
 #include "log_writer.h"
+#include "key_generator.h"
 
 #include <stdlib.h>
 #include <time.h>
@@ -11,7 +12,7 @@
 #include <fstream>
 
 //////////////////// workload parameters /////////////////////
-std::vector<uint64_t> keys;
+std::vector<Key> keys;
 //////////////////// workload parameters /////////////////////
 
 DSM *dsm;
@@ -25,18 +26,6 @@ extern uint64_t rdma_atomic_num;
 extern uint64_t rdma_atomic_size;
 extern uint64_t cache_miss[MAX_APP_THREAD][8];
 extern uint64_t cache_hit[MAX_APP_THREAD][8];
-
-bool skip_BOM(ifstream& in) {
-  char test[4] = {0};
-
-  in.read(test, 3);
-  if (strcmp(test, "\xEF\xBB\xBF") == 0) {
-    return true;
-  } 
-  in.seekg(0);
-
-  return false;
-}
 
 int main(int argc, char *argv[]) {
   if (argc != 4) {
@@ -67,7 +56,8 @@ int main(int argc, char *argv[]) {
   }
 
   LogWriter* lw = new LogWriter("COMPUTE");
-  // lw->LOG_client_info("Single client", 1, workloadPath, numKeys);
+  lw->LOG_client_info("Single client", 1, workloadPath, numKeys);
+
 #ifndef PRIVATE_DEBUG
   fprintf(stdout, "[NOTICE] Start single client benchmark\n");
 #else

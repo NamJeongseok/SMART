@@ -103,10 +103,10 @@ void* run_thread(void* _thread_args) {
   struct timespec insert_start, insert_end;
   struct timespec search_start, search_end;
 
-   if (tid == 0) {
-     // Wait for all clients to initialize
-     dsm->barrier("benchmark");
-   }
+  if (tid == 0) {
+    // Wait for all clients to initialize
+    dsm->barrier("benchmark");
+  }
 
   pthread_barrier_wait(&insert_ready_barrier);
 
@@ -190,7 +190,7 @@ int main(int argc, char *argv[]) {
 
   fprintf(stdout, "[NOTICE] Start reading %lu keys\n", numKeys);
 
-  uint64_t k;
+  Key k;
   for (uint64_t i = 0; i < numKeys; ++i) {
     ifs >> k;
     s_keys.push_back(int2key(k));
@@ -216,12 +216,14 @@ int main(int argc, char *argv[]) {
     }
   }
 
-  fprintf(stdout, "[NOTICE] Start dividing keys to %d threads\n", threadNum);
+  dsm->resetThread();
+
+  fprintf(stdout, "[NOTICE] Start dividing keys to %d threads (coroutine disabled)\n", threadNum);
   rr_i_keys = gen_key_multi_client(i_keys, numInsertKeys, config.computeNR, threadNum, 1, dsm->getMyNodeID());
   rr_s_keys = gen_key_multi_client(s_keys, numKeys, config.computeNR, threadNum, 1, dsm->getMyNodeID()); 
 
   LogWriter* lw = new LogWriter("COMPUTE");
-  lw->LOG_client_info("Mutli client", threadNum, workloadPath, numKeys, 1, 32);
+  lw->LOG_client_info("Mutli client", threadNum, workloadPath, numKeys);
 
   for (int i = 0; i < threadNum; ++i) {
     lw->LOG("[NOTICE] Num. of keys for thread %d: %d", i, rr_i_keys[i].size());
@@ -229,7 +231,6 @@ int main(int argc, char *argv[]) {
 
 
   fprintf(stdout, "[NOTICE] Start multi client benchmark\n");
-
 
   tid_list = new pthread_t[threadNum];
   struct ThreadArgs* thread_args_list = new ThreadArgs[threadNum];
