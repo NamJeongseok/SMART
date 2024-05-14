@@ -1213,14 +1213,16 @@ search_finish:
 /*
   range query, DO NOT support corotine currently
 */
-// [from, to)
-void Tree::range_query(const Key &from, const Key &to, std::map<Key, Value> &ret) {
+// [from, to) ==> fixed into [from, to]
+void Tree::range_query(const Key &from, const Key &_to, std::map<Key, Value> &ret) {
   thread_local std::vector<ScanContext> survivors;
   thread_local std::vector<RdmaOpRegion> rs;
   thread_local std::vector<ScanContext> si;
   thread_local std::vector<RangeCache> range_cache;
   thread_local std::set<uint64_t> tokens;
 
+  // Temporaly add +1 to contain "to"
+  Key to = _to + 1;
   assert(dsm->is_register());
   if (to <= from) return;
 
