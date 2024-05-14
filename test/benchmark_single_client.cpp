@@ -12,7 +12,7 @@
 #include <fstream>
 
 //////////////////// workload parameters /////////////////////
-std::vector<Key> keys;
+std::vector<uint64_t> keys;
 //////////////////// workload parameters /////////////////////
 
 DSM *dsm;

@@ -20,6 +20,8 @@ class DSM {
 
 public:
   void registerThread();
+  void resetThread() { appID.store(0); }
+
   void loadKeySpace(const std::string& load_workloads_path, bool is_str);
   Key getRandomKey();
   Key getNoComflictKey(uint64_t key_hash, uint64_t global_thread_id, uint64_t global_thread_num);

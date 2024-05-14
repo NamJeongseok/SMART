@@ -190,7 +190,7 @@ int main(int argc, char *argv[]) {
 
   fprintf(stdout, "[NOTICE] Start reading %lu keys\n", numKeys);
 
-  Key k;
+  uint64_t k;
   for (uint64_t i = 0; i < numKeys; ++i) {
     ifs >> k;
     s_keys.push_back(int2key(k));
