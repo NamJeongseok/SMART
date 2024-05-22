@@ -2,7 +2,8 @@
 
 DEBUG=0
 memoryNR=1
-workloadPath=/mnt/ssd/data/review-82M-v2.csv
+ycsb=1
+workloadPath=_test
 
 if [ ! -f ${workloadPath} ]; then
   echo "[ERROR] No workload named ${workloadPath}"
@@ -27,7 +28,7 @@ numKeys=$(cat ${workloadPath} | wc -l)
 ../script/hugepage.sh
 
 # Start benchmark
-./benchmark_single_client ${memoryNR} ${workloadPath} ${numKeys}
+./benchmark_single_client ${ycsb} ${memoryNR} ${workloadPath} ${numKeys}
 
 # Clear HugePage
 ../script/clear_hugepage.sh

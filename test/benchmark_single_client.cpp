@@ -12,6 +12,7 @@
 #include <fstream>
 
 //////////////////// workload parameters /////////////////////
+std::vector<Request> requests;
 std::vector<uint64_t> keys;
 //////////////////// workload parameters /////////////////////
 
@@ -26,49 +27,9 @@ extern uint64_t rdma_atomic_num;
 extern uint64_t rdma_atomic_size;
 extern uint64_t cache_miss[MAX_APP_THREAD][8];
 extern uint64_t cache_hit[MAX_APP_THREAD][8];
+bool   is_ycsb;
 
-int main(int argc, char *argv[]) {
-  if (argc != 4) {
-    fprintf(stderr, "[ERROR] Three arguments are required but received %d\n", argc - 1);
-    exit(1);
-  }
-
-  DSMConfig config;
-  config.isCompute = true;
-  config.computeNR = 1;
-  config.memoryNR = atoi(argv[1]);
-
-  std::string workloadPath = argv[2];
-  uint64_t numKeys = atol(argv[3]);
-
-  /* Start reading keys */
-  std::ifstream ifs;
-  ifs.open(workloadPath);
-
-  if (skip_BOM(ifs)) {
-    printf("[NOTICE] Removed BOM in target workload\n");
-  }
-
-  fprintf(stdout, "[NOTICE] Start reading %lu keys\n", numKeys);
-  keys.reserve(numKeys);
-  for (uint64_t i = 0; i < numKeys; ++i) {
-    ifs >> keys[i];
-  }
-
-  LogWriter* lw = new LogWriter("COMPUTE");
-  lw->LOG_client_info("Single client", 1, workloadPath, numKeys);
-
-#ifndef PRIVATE_DEBUG
-  fprintf(stdout, "[NOTICE] Start single client benchmark\n");
-#else
-  fprintf(stdout, "[NOTICE] Start single client benchmark (DEBUG mode)\n");
-#endif
-  dsm = DSM::getInstance(config);
-  dsm->registerThread();
-  tree = new Tree(dsm);
-
-  dsm->barrier("benchmark");
-
+void run_key_only_workload (uint64_t numKeys, LogWriter *lw) {
   printf("[NOTICE] Start insert\n");
   struct timespec insert_start, insert_end;
   clock_gettime(CLOCK_REALTIME, &insert_start);
@@ -116,6 +77,126 @@ int main(int argc, char *argv[]) {
 #endif
 
   delete lw;
+}
+
+void run_ycsb_workload(uint64_t numKeys,  LogWriter *lw) {
+  printf("[NOTICE] Start YCSB Benchmark\n");
+  struct timespec bench_start, bench_end;
+  clock_gettime(CLOCK_REALTIME, &bench_start);
+  
+  uint64_t insert_num = 0;
+  uint64_t search_num = 0;
+  uint64_t scan_num = 0;
+  uint64_t found_num = 0;
+  for (uint64_t i = 0; i < numKeys; ++i) {
+    Request r = requests[i];
+    if (r.is_search) {
+      Value v;
+      tree->search(r.k, v);
+      if (v == key2int(r.k)) found_num++;
+      search_num++;
+    }
+    else if (r.is_update || r.is_insert)  {
+      tree->insert(r.k, r.v,  nullptr, 0, r.is_update);
+      insert_num++;
+    }
+    else {
+      std::map<Key, Value> ret;
+      assert(r.range_size > 0);
+      tree->range_query(r.k, r.k+r.range_size, ret);
+      scan_num++;
+    }
+  }
+  
+  clock_gettime(CLOCK_REALTIME, &bench_end);
+  uint64_t bench_time = (bench_end.tv_sec - bench_start.tv_sec) * 1000000000 + (bench_end.tv_nsec - bench_start.tv_nsec);
+  lw->LOG("Average Bench latency(nsec/op): %.3e", (double)bench_time/(double)numKeys);
+  lw->LOG("INSERT num: %lu", insert_num);
+  lw->LOG("SCAN   num: %lu", scan_num);
+  lw->LOG("SEARCH num: %lu", search_num);
+  lw->LOG("SEARCH found num: %lu", found_num);
+
+  dsm->set_key("metric", "LATENCY");
+  dsm->set_key("insert_keys", numKeys);
+  dsm->set_key("inserted_keys", numKeys);
+  dsm->set_key("insert_time", 0UL);
+  dsm->set_key("search_keys", numKeys);
+  dsm->set_key("searched_keys", found_num);
+  dsm->set_key("search_time", bench_time);
+
+  delete lw;
+}
+
+int main(int argc, char *argv[]) {
+  if (argc != 5) {
+    fprintf(stderr, "[ERROR] Four arguments are required but received %d\n", argc - 1);
+    exit(1);
+  }
+
+  DSMConfig config;
+  config.isCompute = true;
+  config.computeNR = 1;
+  is_ycsb = !!atoi(argv[1]);
+  config.memoryNR = atoi(argv[2]);
+
+  std::string workloadPath = argv[3];
+  uint64_t numKeys = atol(argv[4]);
+
+  /* Start reading keys */
+  std::ifstream ifs;
+  ifs.open(workloadPath);
+
+  if (skip_BOM(ifs)) {
+    printf("[NOTICE] Removed BOM in target workload\n");
+  }
+
+  fprintf(stdout, "[NOTICE] Start reading %lu workloads\n", numKeys);
+  // YCSB workloads
+  if (is_ycsb) {
+    requests.reserve(numKeys);
+
+    std::string op;
+    uint64_t int_key;
+    uint64_t range_size;
+    for (uint64_t i = 0; i < numKeys; ++i) {
+      ifs >> op >> int_key;
+      if (op == "SCAN") ifs >> range_size;
+      Request r;
+      r.is_search = (op == "READ");
+      r.is_insert = (op == "INSERT");
+      r.is_update = (op == "UPDATE");
+      r.range_size = (op == "SCAN") ? range_size : 0;
+      r.k = int2key(int_key);
+      r.v = int_key;
+
+      requests[i] = r;
+    }
+  }
+  // Key-only workloads
+  else {
+    keys.reserve(numKeys);
+    for (uint64_t i = 0; i < numKeys; ++i) {
+      ifs >> keys[i];
+    }
+  }
+
+
+  LogWriter* lw = new LogWriter("COMPUTE");
+  lw->LOG_client_info("Single client", 1, workloadPath, numKeys);
+
+#ifndef PRIVATE_DEBUG
+  fprintf(stdout, "[NOTICE] Start single client benchmark\n");
+#else
+  fprintf(stdout, "[NOTICE] Start single client benchmark (DEBUG mode)\n");
+#endif
+  dsm = DSM::getInstance(config);
+  dsm->registerThread();
+  tree = new Tree(dsm);
+
+  dsm->barrier("benchmark");
+
+  if (is_ycsb) run_ycsb_workload(numKeys, lw);
+  else run_key_only_workload(numKeys, lw);
 
   return 0;
 }

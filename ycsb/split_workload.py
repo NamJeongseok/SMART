@@ -1,4 +1,12 @@
-import sys
+import sys, subprocess
+
+"""
+SPLIT PARAMETERS
+"""
+bulkload     = True     # True if bulkload is needed, else False.
+bulk_ratio   = '0.1'    # Specify the ratio of bulk load. default: 0.1
+loader_ratio = '1.0'    # Ratio of Loaders compared with the total num. of client threads.
+
 
 class bcolors:
     HEADER = '\033[95m'
@@ -12,14 +20,14 @@ class bcolors:
 
 if (len(sys.argv) != 5) and (len(sys.argv) != 6) and (len(sys.argv) != 7) and (len(sys.argv) != 8):
     print(bcolors.WARNING + 'Usage:')
-    print('python3 split_workload.py workload_name[a/b/c/d/e] key_type[randint/email] CN_num client_per_CN (loader_num) (load_ratio) (trans_ratio)' + bcolors.ENDC)
+    print('python3 split_workload.py workload_name[a/b/c/d/e] key_type[randint/email] CN_num client_per_CN (loader_ratio) (load_ratio) (trans_ratio)' + bcolors.ENDC)
     exit(0)
 
 workload = sys.argv[1]
 keyType = sys.argv[2]
 CNum = sys.argv[3]
 clientPerNode = sys.argv[4]
-loader_num = '8' if len(sys.argv) == 5 else sys.argv[5]  # [CONFIG] 8
+loader_num = loader_ratio if len(sys.argv) == 5 else sys.argv[5]  # [CONFIG] 8
 load_ratio = '1.0' if len(sys.argv) <= 6 else sys.argv[6]
 trans_ratio = '1.0' if len(sys.argv) <= 7 else sys.argv[7]
 
@@ -31,9 +39,10 @@ print('loader_num = ' + loader_num + bcolors.ENDC)
 
 CNum = int(CNum)
 clientPerNode = int(clientPerNode)
-loader_num = int(loader_num)
+loader_num = int(float(loader_num)*clientPerNode) 
 splitNums = {
-    "load": CNum * min(clientPerNode, loader_num),
+    "load": CNum * min(clientPerNode, loader_num)+1 if bulkload 
+            else CNum * min(clientPerNode, loader_num),
     "txn": CNum * clientPerNode
 }
 for op in ["load", "txn"]:
@@ -43,13 +52,26 @@ for op in ["load", "txn"]:
     with open(fname, "r") as wlFile:
         lines = wlFile.readlines()
         lineNum = int(len(lines) * float(load_ratio)) if op == "load" else int(len(lines) * float(trans_ratio))
-        splitSize = lineNum // splitNum
+        bulkNum = 0
+        if (bulkload) and op == "load":
+            bulkNum = int(lineNum * float(bulk_ratio))
+            splitSize = (lineNum-bulkNum) // (splitNum-1)
+        else:
+            splitSize = lineNum // splitNum
         for i in range(splitNum):
-            s, e = i * splitSize, (i + 1) * splitSize
+            if bulkload and i == 0 and op == "load":
+                s, e = 0, bulkNum
+                splitFname = fname + "bulk"
+            elif op == "load": 
+                s, e = ((i-1) * splitSize) + bulkNum, ((i) * splitSize) + bulkNum
+                splitFname = fname + str(i-1)
+            else:
+                s, e = (i * splitSize), ((i + 1) * splitSize)
+                splitFname = fname + str(i)
             if i == splitNum - 1:
                 e = lineNum
             print(s, e)
             slines = lines[int(s): int(e)]
-            splitFname = fname + str(i)
+            
             with open(splitFname, "w") as outFile:
                 outFile.writelines(slines)
