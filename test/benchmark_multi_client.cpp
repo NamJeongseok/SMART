@@ -41,6 +41,8 @@ pthread_barrier_t search_done_barrier;
 uint64_t* insert_time_list;
 extern uint64_t* found_keys_list;
 uint64_t* search_time_list;
+uint64_t* insert_size_list;
+uint64_t* search_size_list;
 
 struct ThreadArgs {
   int tid;
@@ -151,6 +153,8 @@ void run_ycsb_bench(std::string workloadName) {
   insert_time_list = new uint64_t[threadNum]{0};
   found_keys_list = new uint64_t[threadNum]{0};
   search_time_list = new uint64_t[threadNum]{0};
+  insert_size_list = new uint64_t[threadNum]{0};
+  search_size_list = new uint64_t[threadNum]{0};
 
   for (int i = 0; i < threadNum; ++i) {
     thread_args_list[i].tid = i;
@@ -175,8 +179,8 @@ void run_ycsb_bench(std::string workloadName) {
       search_time = search_time_list[i];
     }
 
-    // insert_keys += rr_i_keys[i].size();
-    // search_keys += rr_s_keys[i].size();
+    insert_keys += insert_size_list[i];
+    search_keys += search_size_list[i];
     found_keys += found_keys_list[i];
   }
 
@@ -327,7 +331,7 @@ void* run_ycsb_thread(void* _thread_args) {
     if (int_k > 0 && int_k < (1UL<<56))
       int_keys.push_back(k);
   }
-
+  insert_size_list[tid] = int_keys.size();
   if (tid == 0) {
     dsm->barrier("benchmark");
   }
@@ -375,7 +379,7 @@ void* run_ycsb_thread(void* _thread_args) {
 
     requests.push_back(r);
   }
-
+  search_size_list[tid] = requests.size();
   pthread_barrier_wait(&search_ready_barrier);
 
   if (tid == 0) {
