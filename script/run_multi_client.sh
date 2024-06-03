@@ -8,7 +8,7 @@ threadNum=4
 # else {path}/{filename} for key-only workloads. 
 workloadPath=a
 
-if [ ! -f ${workloadPath} ] & [ ! isYCSB ]; then
+if [ ! -f ${workloadPath} ] && [ "$isYCSB" -eq "0" ] ; then
   echo "[ERROR] No workload named ${workloadPath}"
   exit 1;  
 fi
@@ -25,7 +25,7 @@ if [ ! -d "../test/result" ]; then
   mkdir "../test/result"
 fi
 
-if [ isYCSB ]; then
+if [ "$isYCSB" -eq "1" ]; then
   numKeys=0
 else
   numKeys=$(cat ${workloadPath} | wc -l)
