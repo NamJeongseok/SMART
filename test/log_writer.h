@@ -77,6 +77,14 @@ public:
     fprintf(fpt, "Number of keys: %lu\n", num_keys);
     fprintf(fpt, "============================================================\n");
   }
+
+  void LOG_ycsb_client_info(string bench_type, uint64_t thread_num, string load_workload_path, string txn_workload_path, uint64_t load_num_keys, uint64_t txn_num_keys) {
+    fprintf(fpt, "==================== Client Information ====================\n");
+    fprintf(fpt, "Type: %s (%lu threads)\n", bench_type.c_str(), thread_num);
+    fprintf(fpt, "Load workload: %s (%lu keys)\n", load_workload_path.c_str(), load_num_keys);
+    fprintf(fpt, "Txn workload: %s (%lu keys)\n", txn_workload_path.c_str(), txn_num_keys);
+    fprintf(fpt, "============================================================\n");
+  }
 };
 
 #endif // _LOG_WRITER_H

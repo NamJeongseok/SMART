@@ -29,13 +29,19 @@ static void log_stats(DSM* dsm, bool verbose=false) {
       if (!metric.compare("LATENCY")) {
         lw->LOG("[Client %d latency] Insert: %.3e (nsec/op)\tSearch: %.3e (nsec/op)", 
                 i, (double)insert_time/(double)insert_keys, (double)search_time/(double)search_keys);
-      } else {
+        lw->LOG("[Client %d operation status] Insert: %lu/%lu\tSearch: %lu/%lu", 
+                i, inserted_keys, insert_keys, searched_keys, search_keys);
+      } else if (!metric.compare("THROUGHPUT")) {
         lw->LOG("[Client %d throughput] Insert: %.3e (op/nsec)\tSearch: %.3e (op/nsec)", 
                 i, (double)insert_keys/(double)insert_time, (double)search_keys/(double)search_time);
+        lw->LOG("[Client %d operation status] Insert: %lu/%lu\tSearch: %lu/%lu", 
+                i, inserted_keys, insert_keys, searched_keys, search_keys);
+      } else {
+        lw->LOG("[Client %d throughput] Load: %.3e (op/nsec)\tTxn: %.3e (op/nsec)", 
+                i, (double)insert_keys/(double)insert_time, (double)search_keys/(double)search_time);
+        lw->LOG("[Client %d operation status] Load: %lu/%lu\tTxn: %lu/%lu", 
+                i, inserted_keys, insert_keys, searched_keys, search_keys);
       }
-      
-      lw->LOG("[Client %d operation status] Insert: %lu/%lu\tSearch: %lu/%lu", 
-              i, inserted_keys, insert_keys, searched_keys, search_keys);
     }
 
     cum_insert_keys += insert_keys;
@@ -50,14 +56,23 @@ static void log_stats(DSM* dsm, bool verbose=false) {
 
   if (!std::string(dsm->get_key("metric", 0)).compare("LATENCY")) {
     lw->LOG("[Average latency] Insert: %.3e (nsec/op)\tSearch: %.3e (nsec/op)", 
-            cum_insert_latency/(double)dsm->getComputeNR(), cum_search_latency/(double)dsm->getComputeNR()); 
-  } else {
+            cum_insert_latency/(double)dsm->getComputeNR(), cum_search_latency/(double)dsm->getComputeNR());
+    lw->LOG("[Operation status] Insert: %lu/%lu\tSearch: %lu/%lu",
+            cum_inserted_keys, cum_insert_keys, cum_searched_keys, cum_search_keys);
+  } else if (!std::string(dsm->get_key("metric", 0)).compare("THROUGHPUT")) {
     lw->LOG("[Cumulative throughput] Insert: %.3e (op/nsec)\tSearch: %.3e (op/nsec)", 
             cum_insert_throughput, cum_search_throughput);
+    lw->LOG("[Operation status] Insert: %lu/%lu\tSearch: %lu/%lu",
+            cum_inserted_keys, cum_insert_keys, cum_searched_keys, cum_search_keys);
+  } else if (!std::string(dsm->get_key("metric", 0)).compare("YCSB_THROUGHPUT")) {
+    lw->LOG("[Cumulative throughput] Load: %.3e (op/nsec)\tTxn: %.3e (op/nsec)", 
+            cum_insert_throughput, cum_search_throughput);
+    lw->LOG("[Operation status] Load: %lu/%lu\tTxn: %lu/%lu", 
+            cum_inserted_keys, cum_insert_keys, cum_searched_keys, cum_search_keys);
+  } else {
+    fprintf(stdout, "[ERROR] Unknown metric\n");
+    exit(1);
   }
-
-  lw->LOG("[Operation status] Insert: %lu/%lu\tSearch: %lu/%lu", 
-          cum_inserted_keys, cum_insert_keys, cum_searched_keys, cum_search_keys);
 
   delete lw;
 }

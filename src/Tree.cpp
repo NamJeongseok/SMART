@@ -13,6 +13,7 @@
 #include <mutex>
 
 uint64_t* found_keys_list;
+uint64_t* successed_requests_list;
 
 double cache_miss[MAX_APP_THREAD];
 double cache_hit[MAX_APP_THREAD];

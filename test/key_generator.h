@@ -3,9 +3,6 @@
 #include <algorithm>
 #include <fstream>
 
-#include "Common.h"
-#include "Key.h"
-
 using namespace std;
 
 bool skip_BOM(ifstream& in) {
@@ -44,60 +41,65 @@ enum KeyGenDistribution {
   UNIFORM
 };
 
-std::mt19937_64 get_rand(std::random_device{}());
+template<typename K, typename V>
+class KeyGenerator {
+private:
+  random_device rd;
 
-Value make_value(Key key, bool random = false) {
-  if (!random) return (Value)key2int(key);
-  else {
-    uint64_t rand = (uint64_t)get_rand();
-    return (Value)rand;
-  }
-}
+  vector<K>* gen_seq_keys(uint64_t num_keys, uint16_t num_clients, uint64_t num_threads, uint16_t num_coroutines, uint16_t current_cid);
+  vector<K>* gen_rand_keys(uint64_t num_keys, uint16_t num_clients, uint64_t num_threads, uint16_t num_coroutines, uint16_t current_cid);
+  vector<K>* gen_rand_dup_keys(uint64_t num_keys, uint16_t num_clients, uint64_t num_threads, uint16_t num_coroutines, uint16_t current_cid);
+  vector<K>* gen_rr_keys(uint64_t num_keys, uint16_t num_clients, uint64_t num_threads, uint16_t num_coroutines, uint16_t current_cid, bool shuf);
 
-void print_keys(vector<Key>* keys, int num_threads, int num_coroutines) {
-  for (int i = 0; i < num_threads; ++i) {
-    fprintf(stdout, "[Thread %d]\n", i);
+public:
+  V make_value(K key, bool random = false);
+  void print_keys(vector<K>* keys, uint64_t num_threads, uint16_t num_coroutines);
 
-    uint64_t mod = keys[i].size() % num_coroutines;
-    uint64_t div = keys[i].size() / num_coroutines;
+  vector<K>* gen_key_single_client(vector<K> keys, uint64_t num_keys, uint64_t num_threads, uint16_t num_coroutines, bool shuf = false);
 
-    uint64_t key_idx = 0;
-    for (uint16_t j = 0; j < num_coroutines; ++j) {
-      fprintf(stdout, "  >>> Coroutine %u\n", j);
+  /*
+  ** num_keys       -> Total number of keys among all clients
+  ** num_clients    -> Total number of clients among the cluster
+  ** num_threads    -> Number of threads in each client
+  ** num_coroutines -> Number of coroutines in each thread of each client
+  ** current_cid    -> ID of current client
+  ** genType        -> Key generation type
+  ** 
+  ** e.g., gen_key_multi_client(20, 2, 1, 2, 1, InputGenType::RR_SHUF) 
+  **       -> Total 20 keys
+  **       -> Total 2 clients
+  **       -> 1 threads per client
+  **       -> 2 coroutines per thread
+  **       -> Currently on client 1 (second client)
+  ** 
+  ** Client 1 result)
+  ** [Thread 0]
+  **  >>> Coroutine 0
+  **    Key: 11 
+  **    Key: 19
+  **    Key: 5
+  **    Key: 17
+  **    Key: 3
+  ** [Thread 0]
+  **  >>> Coroutine 1
+  **    Key: 15 
+  **    Key: 7
+  **    Key: 4
+  **    Key: 9
+  **    Key: 13
+  */
 
-      uint64_t keys_per_coroutine = (j < mod) ? div+1 : div;
-      for (uint64_t k = 0; k < keys_per_coroutine; ++k) {
-        fprintf(stdout, "      Key: %lu\n", keys[i][key_idx++]);
-      }
-    }
-  }
-}
+  /* Function for generating keys from scratch. */
+  vector<K>* gen_key_multi_client(uint64_t num_keys, uint16_t num_clients, uint64_t num_threads,
+                                  uint16_t num_coroutines, uint16_t current_cid, KeyGenType genType = KeyGenType::RR_SHUF);
 
-vector<Key>* gen_key_single_client(vector<Key> keys, uint64_t num_keys, int num_threads, int num_coroutines, bool shuf = false) {
-  if (shuf) {
-    random_device rd;
-    shuffle(keys.begin(), keys.end(), std::default_random_engine(rd()));    
-  }
+  /* Function for generating keys from a given dataset. */
+  vector<K>* gen_key_multi_client(vector<K> keys, uint64_t num_keys, uint16_t num_clients,
+                                  uint64_t num_threads, uint16_t num_coroutines, uint16_t current_cid);
+};
 
-  uint64_t period = num_threads * (uint64_t)num_coroutines;
-  uint64_t num_period = (num_keys % period) ? num_keys/period + 1 : num_keys/period;
-
-  vector<Key>* result = new vector<Key>[num_threads];
-
-  for (int i = 0; i < num_threads; ++i) {
-    for (int j = 0; j < num_coroutines; ++j) {
-      for (int k = 0; k < num_period; ++k) {
-        if (i*num_coroutines + j + k*period < keys.size()) {
-          result[i].push_back(keys[i*num_coroutines + j + k*period]);
-        }
-      }
-    }
-  }
-
-  return result;     
-}
-
-vector<Key>* gen_seq_keys(uint64_t num_keys, uint32_t num_clients, int num_threads, int num_coroutines, uint16_t current_cid) {
+template<typename K, typename V>
+vector<K>* KeyGenerator<K, V>::gen_seq_keys(uint64_t num_keys, uint16_t num_clients, uint64_t num_threads, uint16_t num_coroutines, uint16_t current_cid) {
   uint64_t mod = num_keys % (uint64_t)num_clients;
   uint64_t div = num_keys / (uint64_t)num_clients;
 
@@ -113,18 +115,19 @@ vector<Key>* gen_seq_keys(uint64_t num_keys, uint32_t num_clients, int num_threa
   }
 
   // Generate keys for current client
-  vector<Key> client_keys;
+  vector<K> client_keys;
   for (uint64_t i = 0; i < keys_per_client; ++i) {
-    client_keys.push_back(int2key(start + i));
+    client_keys.push_back(start + i);
   }
 
   return gen_key_single_client(client_keys, client_keys.size(), num_threads, num_coroutines);
 }
 
-vector<Key>* gen_rand_keys(uint64_t num_keys, uint32_t num_clients, int num_threads, int num_coroutines, uint16_t current_cid) {
-  vector<Key> keys;
+template<typename K, typename V>
+vector<K>* KeyGenerator<K, V>::gen_rand_keys(uint64_t num_keys, uint16_t num_clients, uint64_t num_threads, uint16_t num_coroutines, uint16_t current_cid) {
+  vector<K> keys;
   for (int i = 0 ; i < num_keys; ++i) {
-    keys.push_back(int2key(i));
+    keys.push_back(i);
   }
   
   random_device rd;
@@ -145,7 +148,7 @@ vector<Key>* gen_rand_keys(uint64_t num_keys, uint32_t num_clients, int num_thre
   }  
 
   // Generate keys for current client
-  vector<Key> client_keys;
+  vector<K> client_keys;
   for (uint64_t i = 0; i < keys_per_client; ++i) {
     client_keys.push_back(keys[start + i]);
   }
@@ -153,66 +156,94 @@ vector<Key>* gen_rand_keys(uint64_t num_keys, uint32_t num_clients, int num_thre
   return gen_key_single_client(client_keys, client_keys.size(), num_threads, num_coroutines);
 }
 
-vector<Key>* gen_rand_dup_keys(uint64_t num_keys, uint32_t num_clients, int num_threads, int num_coroutines, uint16_t current_cid) {
+template<typename K, typename V>
+vector<K>* KeyGenerator<K, V>::gen_rand_dup_keys(uint64_t num_keys, uint16_t num_clients, uint64_t num_threads, uint16_t num_coroutines, uint16_t current_cid) {
   uint64_t mod = num_keys % (uint64_t)num_clients;
   uint64_t div = num_keys / (uint64_t)num_clients;
 
   uint64_t keys_per_client = (current_cid < mod) ? div+1 : div;
 
+  mt19937_64 get_rand(rd());
+
   // Generate keys for current client
-  vector<Key> client_keys;
+  vector<K> client_keys;
   for (uint64_t i = 0; i < keys_per_client; ++i) {
-    client_keys.push_back(int2key((uint64_t)get_rand()));
+    client_keys.push_back((uint64_t)get_rand());
   }
 
   return gen_key_single_client(client_keys, client_keys.size(), num_threads, num_coroutines);
 }
 
-vector<Key>* gen_rr_keys(uint64_t num_keys, uint32_t num_clients, int num_threads, int num_coroutines, uint16_t current_cid, bool shuf) {
+template<typename K, typename V>
+vector<K>* KeyGenerator<K, V>::gen_rr_keys(uint64_t num_keys, uint16_t num_clients, uint64_t num_threads, uint16_t num_coroutines, uint16_t current_cid, bool shuf) {
   // Generate keys for current client
-  vector<Key> client_keys;
+  vector<K> client_keys;
   for (uint64_t i = current_cid; i < num_keys; i += num_clients) {
-    client_keys.push_back(int2key(i));
+    client_keys.push_back(i);
   }
 
   return gen_key_single_client(client_keys, client_keys.size(), num_threads, num_coroutines, shuf);
 }
 
-/*
-** num_keys       -> Total number of keys among all clients
-** num_clients    -> Total number of clients among the cluster
-** num_threads    -> Number of threads in each client
-** num_coroutines -> Number of coroutines in each thread of each client
-** current_cid    -> ID of current client
-** genType        -> Key generation type
-** 
-** e.g., gen_key_multi_client(20, 2, 1, 2, 1, InputGenType::RR_SHUF) 
-**       -> Total 20 keys
-**       -> Total 2 clients
-**       -> 1 threads per client
-**       -> 2 coroutines per thread
-**       -> Currently on client 1 (second client)
-** 
-** Client 1 result)
-** [Thread 0]
-**  >>> Coroutine 0
-**    Key: 11 
-**    Key: 19
-**    Key: 5
-**    Key: 17
-**    Key: 3
-** [Thread 0]
-**  >>> Coroutine 1
-**    Key: 15 
-**    Key: 7
-**    Key: 4
-**    Key: 9
-**    Key: 13
-*/
+template<typename K, typename V>
+V KeyGenerator<K, V>::make_value(K key, bool random) {
+  if (!random) return (V)key;
+  else {
+    mt19937_64 get_rand(rd());
+    uint64_t rand = (uint64_t)get_rand();
+    return (V)rand;
+  }
+}
+
+template<typename K, typename V>
+void KeyGenerator<K, V>::print_keys(vector<K>* keys, uint64_t num_threads, uint16_t num_coroutines) {
+  for (uint64_t i = 0; i < num_threads; ++i) {
+    fprintf(stdout, "[Thread %lu]\n", i);
+
+    uint64_t mod = keys[i].size() % num_coroutines;
+    uint64_t div = keys[i].size() / num_coroutines;
+
+    uint64_t key_idx = 0;
+    for (uint16_t j = 0; j < num_coroutines; ++j) {
+      fprintf(stdout, "  >>> Coroutine %u\n", j);
+
+      uint64_t keys_per_coroutine = (j < mod) ? div+1 : div;
+      for (uint64_t k = 0; k < keys_per_coroutine; ++k) {
+        fprintf(stdout, "      Key: %lu\n", keys[i][key_idx++]);
+      }
+    }
+  }
+}
+
+template<typename K, typename V>
+vector<K>* KeyGenerator<K, V>::gen_key_single_client(vector<K> keys, uint64_t num_keys, uint64_t num_threads, uint16_t num_coroutines, bool shuf) {
+  if (shuf) {
+    random_device rd;
+    shuffle(keys.begin(), keys.end(), std::default_random_engine(rd()));    
+  }
+
+  uint64_t period = num_threads * (uint64_t)num_coroutines;
+  uint64_t num_period = (num_keys % period) ? num_keys/period + 1 : num_keys/period;
+
+  vector<K>* result = new vector<K>[num_threads];
+
+  for (int i = 0; i < num_threads; ++i) {
+    for (int j = 0; j < num_coroutines; ++j) {
+      for (int k = 0; k < num_period; ++k) {
+        if (i*num_coroutines + j + k*period < keys.size()) {
+          result[i].push_back(keys[i*num_coroutines + j + k*period]);
+        }
+      }
+    }
+  }
+
+  return result;     
+}
 
 /* Function for generating keys from scratch. */
-vector<Key>* gen_key_multi_client(uint64_t num_keys, uint32_t num_clients, int num_threads, 
-                                  int num_coroutines, uint16_t current_cid, KeyGenType genType = KeyGenType::RR_SHUF) {
+template<typename K, typename V>
+vector<K>* KeyGenerator<K, V>::gen_key_multi_client(uint64_t num_keys, uint16_t num_clients, uint64_t num_threads, 
+                                              uint16_t num_coroutines, uint16_t current_cid, KeyGenType genType) {
   switch (genType) {
     case KeyGenType::SEQ:
       return gen_seq_keys(num_keys, num_clients, num_threads, num_coroutines, current_cid);
@@ -230,10 +261,11 @@ vector<Key>* gen_key_multi_client(uint64_t num_keys, uint32_t num_clients, int n
 }
 
 /* Function for generating keys from a given dataset. */
-vector<Key>* gen_key_multi_client(vector<Key> keys, uint64_t num_keys, uint32_t num_clients,
-                                  int num_threads, int num_coroutines, uint16_t current_cid) {
+template<typename K, typename V>
+vector<K>* KeyGenerator<K, V>::gen_key_multi_client(vector<K> keys, uint64_t num_keys, uint16_t num_clients,
+                                              uint64_t num_threads, uint16_t num_coroutines, uint16_t current_cid) {
   // Extract keys for current client
-  vector<Key> client_keys;
+  vector<K> client_keys;
   for (uint64_t i = current_cid; i < num_keys; i += num_clients) {
     client_keys.push_back(keys[i]);
   }

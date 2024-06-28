@@ -1,20 +1,17 @@
-#! /bin/bash
+#!/bin/bash
 
-isYCSB=1
 computeNR=1
-memoryNR=1
-threadNum=4
-# YCSB workload name (e.g., a, b, c or d) if YCSB benchmark, 
-# else {path}/{filename} for key-only workloads. 
-workloadPath=a
+memoryNR=2
+threadNum=64
+workloadPath=/mnt/data/review-82M-v2.csv
 
-if [ ! -f ${workloadPath} ] && [ "$isYCSB" -eq "0" ] ; then
+if [ ! -f ${workloadPath} ]; then
   echo "[ERROR] No workload named ${workloadPath}"
   exit 1;  
 fi
 
 if [ ! -d "../build" ]; then
-	mkdir ../build
+  mkdir ../build
 fi
 
 # Compile
@@ -25,17 +22,13 @@ if [ ! -d "../test/result" ]; then
   mkdir "../test/result"
 fi
 
-if [ "$isYCSB" -eq "1" ]; then
-  numKeys=0
-else
-  numKeys=$(cat ${workloadPath} | wc -l)
-fi
+num_keys=$(cat ${workloadPath} | wc -l)
 
 # Set HugePage
 ../script/hugepage.sh
 
 # Start benchmark
-./benchmark_multi_client ${computeNR} ${memoryNR} ${threadNum} ${workloadPath} ${numKeys} ${isYCSB}
+./benchmark_multi_client ${computeNR} ${memoryNR} ${threadNum} ${workloadPath} ${numKeys}
 
 # Clear HugePage
 ../script/clear_hugepage.sh
