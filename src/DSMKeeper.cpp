@@ -51,7 +51,7 @@ void DSMKeeper::initLocalMeta() {
 
 bool DSMKeeper::connectNode(uint16_t remoteID, bool toCompute) {
 
-  setDataToRemote(remoteID);
+  setDataToRemote(remoteID, toCompute);
 
   std::string setK = setKey(remoteID, toCompute);
   memSet(setK.c_str(), setK.size(), (char *)(&localMeta), sizeof(localMeta));
@@ -67,7 +67,7 @@ bool DSMKeeper::connectNode(uint16_t remoteID, bool toCompute) {
   return true;
 }
 
-void DSMKeeper::setDataToRemote(uint16_t remoteID) {
+void DSMKeeper::setDataToRemote(uint16_t remoteID, bool toCompute) {
   if (isCompute) {
     for (int i = 0; i < MAX_APP_THREAD; ++i) {
       auto &c = thCon[i];
@@ -75,12 +75,21 @@ void DSMKeeper::setDataToRemote(uint16_t remoteID) {
         localMeta.appRcQpn2dir[i][k] = c->data[k][remoteID]->qp_num;
       }
     }
-  }
 
-  for (int i = 0; i < NR_DIRECTORY; ++i) {
-    auto &c = dirCon[i];
-    for (int k = 0; k < MAX_APP_THREAD; ++k) {
-      localMeta.dirRcQpn2app[i][k] = c->data2app[k][remoteID]->qp_num;
+    if (toCompute) {
+      for (int i = 0; i < NR_DIRECTORY; ++i) {
+        auto &c = dirCon[i];
+        for (int k = 0; k < MAX_APP_THREAD; ++k) {
+          localMeta.dirRcQpn2app[i][k] = c->data2app[k][remoteID]->qp_num;
+        }
+      }
+    }
+  } else {
+    for (int i = 0; i < NR_DIRECTORY; ++i) {
+      auto &c = dirCon[i];
+      for (int k = 0; k < MAX_APP_THREAD; ++k) {
+        localMeta.dirRcQpn2app[i][k] = c->data2app[k][remoteID]->qp_num;
+      }
     }
   }
 }
@@ -161,7 +170,7 @@ void DSMKeeper::setDataFromRemote(uint16_t remoteID, ExchangeMeta *remoteMeta) {
 }
 
 void DSMKeeper::connectMySelf() {
-  setDataToRemote(getMyNodeID());
+  setDataToRemote(getMyNodeID(), isCompute);
   setDataFromRemote(getMyNodeID(), &localMeta);
 }
 

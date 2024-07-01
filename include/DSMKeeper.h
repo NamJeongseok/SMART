@@ -88,7 +88,7 @@ private:
   void connectMySelf();
   void initRouteRule();
 
-  void setDataToRemote(uint16_t remoteID);
+  void setDataToRemote(uint16_t remoteID, bool toCompute);
   void setDataFromRemote(uint16_t remoteID, ExchangeMeta *remoteMeta);
 
 protected:
