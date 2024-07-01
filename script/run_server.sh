@@ -16,7 +16,7 @@ if [ ! -d "../test/result" ]; then
 fi
 
 # Set HugePage
-../script/hugepage.sh
+../script/hugepage_memory.sh
 ../script/restartMemc.sh
 
 # Start benchmark

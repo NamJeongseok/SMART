@@ -211,6 +211,7 @@ private:
   static thread_local LocalAllocator local_allocators[MEMORY_NODE_NUM][NR_DIRECTORY];
   static thread_local RdmaBuffer rbuf[MAX_CORO_NUM];
 
+  uint64_t dsmSize;
   uint64_t baseAddr;
   uint32_t myNodeID;
   uint64_t keySpaceSize;

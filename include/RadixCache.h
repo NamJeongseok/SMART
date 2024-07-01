@@ -196,7 +196,7 @@ private:
   // GC
   tbb::concurrent_queue<CacheEntry*> cache_entry_gc;
   tbb::concurrent_queue<CacheHeader*> cache_hdr_gc;
-  static const int safely_free_epoch = 2 * MAX_APP_THREAD * MAX_CORO_NUM;
+  static const int safely_free_epoch = 10 * MAX_APP_THREAD * MAX_CORO_NUM;
 
   // FIFIO Eviction
   DSM *dsm;

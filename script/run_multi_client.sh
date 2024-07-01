@@ -22,10 +22,10 @@ if [ ! -d "../test/result" ]; then
   mkdir "../test/result"
 fi
 
-num_keys=$(cat ${workloadPath} | wc -l)
+numKeys=$(cat ${workloadPath} | wc -l)
 
 # Set HugePage
-../script/hugepage.sh
+../script/hugepage_compute.sh
 
 # Start benchmark
 ./benchmark_multi_client ${computeNR} ${memoryNR} ${threadNum} ${workloadPath} ${numKeys}

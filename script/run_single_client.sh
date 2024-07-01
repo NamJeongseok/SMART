@@ -25,7 +25,7 @@ fi
 numKeys=$(cat ${workloadPath} | wc -l)
 
 # Set HugePage
-../script/hugepage.sh
+../script/hugepage_compute.sh
 
 # Start benchmark
 ./benchmark_single_client ${ycsb} ${memoryNR} ${workloadPath} ${numKeys}

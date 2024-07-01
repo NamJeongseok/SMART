@@ -16,11 +16,12 @@ public:
   bool     isCompute;
   uint32_t computeNR;
   uint32_t memoryNR;
-  uint64_t dsmSize;       // G
+  uint64_t dsmSizeCompute;       // G
+  uint64_t dsmSizeMemory;        // G
 
   DSMConfig(const CacheConfig &cacheConfig = CacheConfig(),
-            uint32_t memoryNR = 12, uint32_t computeNR = 12, uint64_t dsmSize = define::dsmSize)
-      : cacheConfig(cacheConfig), computeNR(computeNR), memoryNR(memoryNR), dsmSize(dsmSize) {}
+            uint32_t memoryNR = 12, uint32_t computeNR = 12, uint64_t dsmSizeCompute = define::dsmSizeCompute, uint64_t dsmSizeMemory = define::dsmSizeMemory)
+      : cacheConfig(cacheConfig), computeNR(computeNR), memoryNR(memoryNR), dsmSizeCompute(dsmSizeCompute), dsmSizeMemory(dsmSizeMemory) {}
 };
 
 #endif /* __CONFIG_H__ */

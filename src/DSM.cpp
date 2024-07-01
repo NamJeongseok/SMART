@@ -34,13 +34,19 @@ DSM *DSM::getInstance(const DSMConfig &conf) {
 DSM::DSM(const DSMConfig &conf)
     : conf(conf), appID(0), cache(conf.cacheConfig) {
 
-  baseAddr = (uint64_t)hugePageAlloc(conf.dsmSize * define::GB);
+  if (conf.isCompute) {
+    dsmSize = conf.dsmSizeCompute;
+  } else {
+    dsmSize = conf.dsmSizeMemory;
+  }
 
-  Debug::notifyInfo("shared memory size: %dGB, 0x%lx", conf.dsmSize, baseAddr);
+  baseAddr = (uint64_t)hugePageAlloc(dsmSize * define::GB);
+
+  Debug::notifyInfo("shared memory size: %dGB, 0x%lx", dsmSize, baseAddr);
   Debug::notifyInfo("rdma cache size: %dGB", conf.cacheConfig.cacheSize);
 
   // warmup
-  memset((char *)baseAddr, 0, conf.dsmSize * define::GB);
+  memset((char *)baseAddr, 0, dsmSize * define::GB);
   memset((char *)cache.data, 0, cache.size * define::GB);
 
   initRDMAConnection();
@@ -54,7 +60,7 @@ DSM::DSM(const DSMConfig &conf)
   keeper->barrier("DSM-init");
 }
 
-DSM::~DSM() { hugePageFree((void *)baseAddr, conf.dsmSize * define::GB); }
+DSM::~DSM() { hugePageFree((void *)baseAddr, dsmSize * define::GB); }
 
 void DSM::registerThread() {
 
@@ -121,7 +127,7 @@ void DSM::initRDMAConnection() {
 
     for (int i = 0; i < NR_DIRECTORY; ++i) {
       dirCon[i] =
-          new DirectoryConnection(i, (void *)baseAddr, conf.dsmSize * define::GB,
+          new DirectoryConnection(i, (void *)baseAddr, dsmSize * define::GB,
                                   conf.computeNR, remoteInfo, true);
     }
   } else {
@@ -130,7 +136,7 @@ void DSM::initRDMAConnection() {
     remoteInfo = new RemoteConnection[conf.computeNR];
     for (int i = 0; i < NR_DIRECTORY; ++i) {
       dirCon[i] =
-          new DirectoryConnection(i, (void *)baseAddr, conf.dsmSize * define::GB,
+          new DirectoryConnection(i, (void *)baseAddr, dsmSize * define::GB,
                                   conf.computeNR, remoteInfo);
     }
   }

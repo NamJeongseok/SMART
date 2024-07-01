@@ -37,7 +37,7 @@ loadNumKeys=$(cat ${loadWorkloadPath} | wc -l)
 txnNumKeys=$(cat ${txnWorkloadPath} | wc -l)
 
 # Set HugePage
-../script/hugepage.sh
+../script/hugepage_compute.sh
 
 # Start benchmark
 ./benchmark_ycsb_client ${computeNR} ${memoryNR} ${threadNum} ${workloadDir} ${workloadName} ${loadNumKeys} ${txnNumKeys}
