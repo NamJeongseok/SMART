@@ -106,7 +106,7 @@ void* run_thread(void* _thread_args) {
       successed_requests_list[tid]++;
     } else if (rr_txn_requests[tid][i].op == OpType::SEARCH) {
       auto ret = tree->search(rr_txn_requests[tid][i].key, v);
-      if (ret && v ==key2int(rr_txn_requests[tid][i].key)) {
+      if (ret && v == key2int(rr_txn_requests[tid][i].key)) {
         successed_requests_list[tid]++;
       }
     } else if (rr_txn_requests[tid][i].op == OpType::UPDATE) {
@@ -116,6 +116,7 @@ void* run_thread(void* _thread_args) {
       assert(rr_txn_requests[tid][i].range_size > 0);
       std::map<Key, Value> ret;
       tree->range_query(rr_txn_requests[tid][i].key, rr_txn_requests[tid][i].key + rr_txn_requests[tid][i].range_size, ret);
+      successed_requests_list[tid]++;
     } else {
       assert(false);
     }
