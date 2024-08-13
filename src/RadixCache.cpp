@@ -259,7 +259,6 @@ void RadixCache::_evict() {
     if (__sync_bool_compare_and_swap(&cache_root, cache_root, new CacheNode())) {
       free_manager = new FreeMemManager(define::MB * cache_size);
       node_queue = new tbb::concurrent_queue<CacheNode*>();
-
       node_queue->push(cache_root);
     }
   }
