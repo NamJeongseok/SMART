@@ -17,7 +17,6 @@ fi
 
 # Set HugePage
 ../script/hugepage_memory.sh
-../script/restartMemc.sh
 
 # Start benchmark
 ./benchmark_server ${computeNR} ${memoryNR}
