@@ -1,10 +1,10 @@
 #!/bin/bash
 
-computeNR=1
+computeNR=2
 memoryNR=2
 threadNum=64
 # Path to the directory where YCSB workload exists
-workloadDir=/mnt/data/ycsb_workloads
+workloadDir=/mnt/data
 # YCSB workload name (e.g., a, b, c or d)
 workloadName=a
 

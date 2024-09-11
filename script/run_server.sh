@@ -1,7 +1,7 @@
 #! /bin/bash
 
-computeNR=1
-memoryNR=1
+computeNR=2
+memoryNR=2
 
 if [ ! -d "../build" ]; then
 	mkdir ../build

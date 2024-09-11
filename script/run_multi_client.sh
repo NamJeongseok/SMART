@@ -1,6 +1,6 @@
 #!/bin/bash
 
-computeNR=1
+computeNR=2
 memoryNR=2
 threadNum=64
 workloadPath=/mnt/data/review-82M-v2.csv
