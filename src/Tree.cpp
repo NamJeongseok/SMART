@@ -68,6 +68,9 @@ retry:
   }
 }
 
+Tree::~Tree(void) {
+  index_cache->statistics();
+}
 
 GlobalAddress Tree::get_root_ptr_ptr() {
   GlobalAddress addr;

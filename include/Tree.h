@@ -59,6 +59,7 @@ enum {
 class Tree {
 public:
   Tree(DSM *dsm, uint16_t tree_id = 0);
+  ~Tree(void);
 
   using WorkFunc = std::function<void (Tree *, const Request&, CoroContext *, int)>;
   void run_coroutine(GenFunc gen_func, WorkFunc work_func, int coro_cnt, Request* req = nullptr, int req_num = 0);

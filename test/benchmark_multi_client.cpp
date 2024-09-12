@@ -279,6 +279,7 @@ int main(int argc, char *argv[]) {
   dsm->set_key("search_time", search_time);  
     
   delete lw;
+  delete tree;
 
   return 0;
 }

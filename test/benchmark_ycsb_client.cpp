@@ -316,6 +316,7 @@ int main(int argc, char *argv[]) {
   dsm->set_key("search_time", txn_time);  
     
   delete lw;
+  delete tree;
 
   return 0;
 }
