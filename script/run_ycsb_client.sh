@@ -9,7 +9,18 @@ workloadDir=/mnt/data
 workloadName=a
 
 loadWorkloadPath=${workloadDir}/load_randint_workload${workloadName}
-txnWorkloadPath=${workloadDir}/txn_randint_workload${workloadName}
+
+if [ "$workloadName" = "d" ]; then
+  txnWorkloadPath=${workloadDir}/txn_randint_workload${workloadName}_new
+elif [ "$workloadName" = "25" ]; then
+  txnWorkloadPath=${workloadDir}/txn_randint_workload${workloadName}_new
+elif [ "$workloadName" = "50" ]; then
+  txnWorkloadPath=${workloadDir}/txn_randint_workload${workloadName}_new
+elif [ "$workloadName" = "75" ]; then
+  txnWorkloadPath=${workloadDir}/txn_randint_workload${workloadName}_new
+else
+  txnWorkloadPath=${workloadDir}/txn_randint_workload${workloadName}
+fi
 
 if [ ! -f ${loadWorkloadPath} ]; then
   echo "[ERROR] YCSB load workload (${loadWorkloadPath}) missing"

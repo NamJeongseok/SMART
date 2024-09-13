@@ -160,6 +160,9 @@ int main(int argc, char *argv[]) {
 
   std::string ycsbLoadPath = workloadDir + "/load_randint_workload" + workloadName;
   std::string ycsbTxnPath = workloadDir + "/txn_randint_workload" + workloadName;
+  if (workloadName == "d" || workloadName == "25" || workloadName == "50" || workloadName == "75") {
+    ycsbTxnPath += "_new";
+  } 
 
   uint64_t bulkNumKeys = 102400;
 
