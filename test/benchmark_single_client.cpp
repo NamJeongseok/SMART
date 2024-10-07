@@ -54,8 +54,8 @@ int main(int argc, char *argv[]) {
   }
 
   LogWriter* lw = new LogWriter("COMPUTE");
-  lw->print_client_info(1, define::kIndexCacheSize, workloadPath.c_str(), 0, numKeys, numKeys);
-  lw->LOG_client_info(1, define::kIndexCacheSize, workloadPath.c_str(), 0, numKeys, numKeys);
+  lw->print_client_info(1, define::kIndexCacheSize*define::MB, workloadPath.c_str(), 0, numKeys, numKeys);
+  lw->LOG_client_info(1, define::kIndexCacheSize*define::MB, workloadPath.c_str(), 0, numKeys, numKeys);
 
   fprintf(stdout, "[NOTICE] Start single client benchmark\n");
   dsm = DSM::getInstance(config);
@@ -97,7 +97,7 @@ int main(int argc, char *argv[]) {
 
   dsm->set_key("metric", "REAL_LATENCY");
   dsm->set_key("thread_num", 1UL);
-  dsm->set_key("cache_size", (uint64_t)define::kIndexCacheSize);
+  dsm->set_key("cache_size", (uint64_t)(define::kIndexCacheSize*define::MB));
   dsm->set_key("bulk_keys", 0UL);
   dsm->set_key("load_workload_path", workloadPath);
   dsm->set_key("txn_workload_path", workloadPath);

@@ -401,7 +401,7 @@ void RadixCache::statistics() {
 CacheStats* RadixCache::get_statistics() {
   CacheStats* cache_stats = new CacheStats;
 
-  cache_stats->cache_size = cache_size;
+  cache_stats->cache_size = cache_size*define::MB;
   cache_stats->free_cache_size = free_manager->remain_size();
   cache_stats->cache_node_num = node_queue->unsafe_size();
 

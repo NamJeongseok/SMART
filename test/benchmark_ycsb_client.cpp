@@ -263,8 +263,8 @@ int main(int argc, char *argv[]) {
   txn_requests.shrink_to_fit();
 
   LogWriter* lw = new LogWriter("COMPUTE");
-  lw->print_ycsb_client_info(threadNum, define::kIndexCacheSize, ycsbLoadPath.c_str(), ycsbTxnPath.c_str(), loadNumKeys - bulkNumKeys, txnNumKeys, bulkNumKeys);
-  lw->LOG_ycsb_client_info(threadNum, define::kIndexCacheSize, ycsbLoadPath.c_str(), ycsbTxnPath.c_str(), loadNumKeys - bulkNumKeys, txnNumKeys, bulkNumKeys);
+  lw->print_ycsb_client_info(threadNum, define::kIndexCacheSize*define::MB, ycsbLoadPath.c_str(), ycsbTxnPath.c_str(), loadNumKeys - bulkNumKeys, txnNumKeys, bulkNumKeys);
+  lw->LOG_ycsb_client_info(threadNum, define::kIndexCacheSize*define::MB, ycsbLoadPath.c_str(), ycsbTxnPath.c_str(), loadNumKeys - bulkNumKeys, txnNumKeys, bulkNumKeys);
 
   fprintf(stdout, "[NOTICE] Start initializing index structure\n");
   dsm->registerThread();
@@ -325,7 +325,7 @@ int main(int argc, char *argv[]) {
 
   dsm->set_key("metric", "YCSB_THROUGHPUT");
   dsm->set_key("thread_num", (uint64_t)threadNum);
-  dsm->set_key("cache_size", (uint64_t)define::kIndexCacheSize);
+  dsm->set_key("cache_size", (uint64_t)(define::kIndexCacheSize*define::MB));
   dsm->set_key("bulk_keys", bulkNumKeys);
   dsm->set_key("load_workload_path", ycsbLoadPath);
   dsm->set_key("txn_workload_path", ycsbTxnPath);

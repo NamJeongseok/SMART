@@ -213,8 +213,8 @@ int main(int argc, char *argv[]) {
   rr_s_keys = key_gen.gen_key_multi_client(s_keys, numKeys, config.computeNR, threadNum, 1, dsm->getMyNodeID()); 
 
   LogWriter* lw = new LogWriter("COMPUTE");
-  lw->print_client_info(threadNum, define::kIndexCacheSize, workloadPath.c_str(), numBulkKeys, numInsertKeys, numKeys);
-  lw->LOG_client_info(threadNum, define::kIndexCacheSize, workloadPath.c_str(), numBulkKeys, numInsertKeys, numKeys);
+  lw->print_client_info(threadNum, define::kIndexCacheSize*define::MB, workloadPath.c_str(), numBulkKeys, numInsertKeys, numKeys);
+  lw->LOG_client_info(threadNum, define::kIndexCacheSize*define::MB, workloadPath.c_str(), numBulkKeys, numInsertKeys, numKeys);
 
   fprintf(stdout, "[NOTICE] Start initializing index structure\n");
   dsm->registerThread();
@@ -275,7 +275,7 @@ int main(int argc, char *argv[]) {
 
   dsm->set_key("metric", "REAL_THROUGHPUT");
   dsm->set_key("thread_num", (uint64_t)threadNum);
-  dsm->set_key("cache_size", (uint64_t)define::kIndexCacheSize);
+  dsm->set_key("cache_size", (uint64_t)(define::kIndexCacheSize*define::MB));
   dsm->set_key("bulk_keys", numBulkKeys);
   dsm->set_key("load_workload_path", workloadPath);
   dsm->set_key("txn_workload_path", workloadPath);
