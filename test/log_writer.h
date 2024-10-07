@@ -108,8 +108,8 @@ public:
   void LOG_client_cache_info(CacheStats* cache_stats) {
     fprintf(fpt, "\n[Cache statistics]\n");
     fprintf(fpt, "Total cache size: %lu MB\n", cache_stats->cache_size/define::MB); 
-    fprintf(fpt, "  >>> Free cache size: %ld\n", cache_stats->free_cache_size);
-    fprintf(fpt, "  >>> Used cache size: %ld\n", cache_stats->cache_size - cache_stats->free_cache_size);
+    fprintf(fpt, "  >>> Free cache size: %ld B\n", cache_stats->free_cache_size);
+    fprintf(fpt, "  >>> Used cache size: %ld B\n", cache_stats->cache_size - cache_stats->free_cache_size);
     fprintf(fpt, "Cached node number: %ld\n", cache_stats->cache_node_num); 
   }
 
