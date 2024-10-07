@@ -114,7 +114,7 @@ void* run_thread(void* _thread_args) {
     clock_gettime(CLOCK_REALTIME, &insert_start); 
   }
 
-  for (size_t i = 0; i < rr_i_keys[tid].size(); ++i) {
+  for (uint64_t i = 0; i < rr_i_keys[tid].size(); ++i) {
     tree->insert(rr_i_keys[tid][i], (Value)key2int(rr_i_keys[tid][i]));
   }
 
@@ -137,7 +137,7 @@ void* run_thread(void* _thread_args) {
   }
 
   Value v;
-  for (size_t i = 0; i < rr_s_keys[tid].size(); ++i) {
+  for (uint64_t i = 0; i < rr_s_keys[tid].size(); ++i) {
     auto ret = tree->search(rr_s_keys[tid][i], v);
     if (ret && v == (Value)key2int(rr_s_keys[tid][i])) {
       found_keys_list[tid]++;
@@ -163,7 +163,6 @@ void* run_thread(void* _thread_args) {
 int main(int argc, char *argv[]) {
   if (argc != 6) {
     fprintf(stderr, "[ERROR] Five arguments are required but received %d\n", argc - 1);
-    fprintf(stderr, "[USAGE] computeNR, memoryNR, threadNum, workloadPath, numKeys\n");
     exit(1);
   }
 
@@ -179,9 +178,13 @@ int main(int argc, char *argv[]) {
   // Should not exceed maximum thread number
   assert(threadNum < MAX_APP_THREAD);
 
-  /* Start reading keys */
   ifstream ifs;
   ifs.open(workloadPath);
+
+  if (!ifs.is_open()) {
+    fprintf(stdout, "[ERROR] Failed opening file %s (error: %s)\n", workloadPath.c_str(), strerror(errno));
+    exit(1);
+  }
 
   if (skip_BOM(ifs)) {
     fprintf(stdout, "[NOTICE] Removed BOM in target workload\n");
@@ -201,7 +204,19 @@ int main(int argc, char *argv[]) {
   uint64_t numInsertKeys = numKeys - numBulkKeys;
   vector<Key> i_keys(s_keys.begin() + numBulkKeys, s_keys.end());
 
+  fprintf(stdout, "[NOTICE] Start multi client benchmark\n");
   dsm = DSM::getInstance(config);
+
+  fprintf(stdout, "[NOTICE] Start dividing keys to %d threads (coroutine disabled)\n", threadNum);
+  KeyGenerator<Key, Value> key_gen;
+  rr_i_keys = key_gen.gen_key_multi_client(i_keys, numInsertKeys, config.computeNR, threadNum, 1, dsm->getMyNodeID());
+  rr_s_keys = key_gen.gen_key_multi_client(s_keys, numKeys, config.computeNR, threadNum, 1, dsm->getMyNodeID()); 
+
+  LogWriter* lw = new LogWriter("COMPUTE");
+  lw->print_client_info(threadNum, define::kIndexCacheSize, workloadPath.c_str(), numBulkKeys, numInsertKeys, numKeys);
+  lw->LOG_client_info(threadNum, define::kIndexCacheSize, workloadPath.c_str(), numBulkKeys, numInsertKeys, numKeys);
+
+  fprintf(stdout, "[NOTICE] Start initializing index structure\n");
   dsm->registerThread();
   tree = new Tree(dsm);
 
@@ -213,20 +228,6 @@ int main(int argc, char *argv[]) {
   }
 
   dsm->resetThread();
-
-  fprintf(stdout, "[NOTICE] Start dividing keys to %d threads (coroutine disabled)\n", threadNum);
-  KeyGenerator<Key, Value> key_gen;
-  rr_i_keys = key_gen.gen_key_multi_client(i_keys, numInsertKeys, config.computeNR, threadNum, 1, dsm->getMyNodeID());
-  rr_s_keys = key_gen.gen_key_multi_client(s_keys, numKeys, config.computeNR, threadNum, 1, dsm->getMyNodeID()); 
-
-  LogWriter* lw = new LogWriter("COMPUTE");
-  lw->LOG_client_info("Mutli client", threadNum, workloadPath, numKeys);
-
-  for (int i = 0; i < threadNum; ++i) {
-    lw->LOG("[NOTICE] Number of keys in each thread %d: %d", i, rr_i_keys[i].size());
-  }
-
-  fprintf(stdout, "[NOTICE] Start multi client benchmark\n");
 
   tid_list = new pthread_t[threadNum];
   struct ThreadArgs* thread_args_list = new ThreadArgs[threadNum];
@@ -270,14 +271,21 @@ int main(int argc, char *argv[]) {
   lw->LOG("Average insert throughput(op/nsec): %.3e", (double)insert_keys/(double)insert_time);
   lw->LOG("Average search throughput(op/nsec): %.3e (%lu/%lu found)", (double)search_keys/(double)search_time, found_keys, search_keys);
 
-  dsm->set_key("metric", "THROUGHPUT");
-  dsm->set_key("insert_keys", insert_keys);
-  dsm->set_key("inserted_keys", insert_keys);
-  dsm->set_key("insert_time", insert_time);
-  dsm->set_key("search_keys", search_keys);  
-  dsm->set_key("searched_keys", found_keys);   
-  dsm->set_key("search_time", search_time);  
-    
+  lw->LOG_client_cache_info(tree->get_cache_statistics());
+
+  dsm->set_key("metric", "REAL_THROUGHPUT");
+  dsm->set_key("thread_num", (uint64_t)threadNum);
+  dsm->set_key("cache_size", (uint64_t)define::kIndexCacheSize);
+  dsm->set_key("bulk_keys", numBulkKeys);
+  dsm->set_key("load_workload_path", workloadPath);
+  dsm->set_key("txn_workload_path", workloadPath);
+  dsm->set_key("load_keys", insert_keys);
+  dsm->set_key("load_done_keys", insert_keys);
+  dsm->set_key("load_time", insert_time);
+  dsm->set_key("txn_keys", search_keys);
+  dsm->set_key("txn_done_keys", found_keys);
+  dsm->set_key("txn_time", search_time);
+
   delete lw;
   delete tree;
 

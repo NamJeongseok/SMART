@@ -4,7 +4,7 @@ addr=$(head -1 ../memcached.conf)
 port=$(awk 'NR==2{print}' ../memcached.conf)
 
 # kill old me
-cat /tmp/memcached.pid | xargs kill
+pkill -9 -f memcached
 
 # launch memcached
 memcached -u root -l ${addr} -p  ${port} -c 10000 -d -P /tmp/memcached.pid

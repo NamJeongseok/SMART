@@ -1493,6 +1493,12 @@ void Tree::statistics() {
 #endif
 }
 
+CacheStats* Tree::get_cache_statistics() {
+#ifdef TREE_ENABLE_CACHE  
+  return index_cache->get_statistics();
+#endif
+}
+
 void Tree::clear_debug_info() {
   memset(cache_miss, 0, sizeof(uint64_t) * MAX_APP_THREAD);
   memset(cache_hit, 0, sizeof(uint64_t) * MAX_APP_THREAD);

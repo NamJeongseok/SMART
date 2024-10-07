@@ -12,29 +12,65 @@
 #include <fstream>
 
 //////////////////// workload parameters /////////////////////
-std::vector<Request> requests;
-std::vector<uint64_t> keys;
+std::vector<Key> keys;
 //////////////////// workload parameters /////////////////////
 
 DSM *dsm;
 Tree *tree;
 
-extern uint64_t rdma_write_num;
-extern uint64_t rdma_write_size;
-extern uint64_t rdma_read_num;
-extern uint64_t rdma_read_size;
-extern uint64_t rdma_atomic_num;
-extern uint64_t rdma_atomic_size;
-extern uint64_t cache_miss[MAX_APP_THREAD][8];
-extern uint64_t cache_hit[MAX_APP_THREAD][8];
-bool   is_ycsb;
+int main(int argc, char *argv[]) {
+  if (argc != 4) {
+    fprintf(stderr, "[ERROR] Three arguments are required but received %d\n", argc - 1);
+    exit(1);
+  }
 
-void run_key_only_workload (uint64_t numKeys, LogWriter *lw) {
-  printf("[NOTICE] Start insert\n");
+  DSMConfig config;
+  config.isCompute = true;
+  config.computeNR = 1;
+  config.memoryNR = atoi(argv[1]);
+
+  std::string workloadPath = argv[2];
+  uint64_t numKeys = atol(argv[3]);
+
+  std::ifstream ifs;
+  ifs.open(workloadPath);
+
+  if (!ifs.is_open()) {
+    fprintf(stdout, "[ERROR] Failed opening file %s (error: %s)\n", workloadPath.c_str(), strerror(errno));
+    exit(1);
+  }
+  
+  if (skip_BOM(ifs)) {
+    fprintf(stdout, "[NOTICE] Removed BOM in target workload\n");
+  }
+
+  fprintf(stdout, "[NOTICE] Start reading %lu keys\n", numKeys);
+
+  keys.reserve(numKeys);
+  uint64_t k;
+  for (uint64_t i = 0; i < numKeys; ++i) {
+    ifs >> k;
+    keys.push_back(int2key(k));
+  }
+
+  LogWriter* lw = new LogWriter("COMPUTE");
+  lw->print_client_info(1, define::kIndexCacheSize, workloadPath.c_str(), 0, numKeys, numKeys);
+  lw->LOG_client_info(1, define::kIndexCacheSize, workloadPath.c_str(), 0, numKeys, numKeys);
+
+  fprintf(stdout, "[NOTICE] Start single client benchmark\n");
+  dsm = DSM::getInstance(config);
+
+  fprintf(stdout, "[NOTICE] Start initializing index structure\n");
+  dsm->registerThread();
+  tree = new Tree(dsm);
+
+  dsm->barrier("benchmark");
+
+  fprintf(stdout, "[NOTICE] Start insert\n");
   struct timespec insert_start, insert_end;
   clock_gettime(CLOCK_REALTIME, &insert_start);
   for (uint64_t i = 0; i < numKeys; ++i) {
-    tree->insert(int2key(keys[i]), reinterpret_cast<Value>(keys[i]));
+    tree->insert(keys[i], (Value)key2int(keys[i]));
   } 
   clock_gettime(CLOCK_REALTIME, &insert_end);
 
@@ -47,8 +83,8 @@ void run_key_only_workload (uint64_t numKeys, LogWriter *lw) {
   struct timespec search_start, search_end;
   clock_gettime(CLOCK_REALTIME, &search_start);
   for (uint64_t i = 0; i < numKeys; ++i) {
-    auto ret = tree->search(int2key(keys[i]), v);
-    if (ret && v == reinterpret_cast<Value>(keys[i])) {
+    auto ret = tree->search(keys[i], v);
+    if (ret && v == (Value)key2int(keys[i])) {
       found_keys++;
     }
   }
@@ -57,146 +93,23 @@ void run_key_only_workload (uint64_t numKeys, LogWriter *lw) {
   uint64_t search_time = (search_end.tv_sec - search_start.tv_sec) * 1000000000 + (search_end.tv_nsec - search_start.tv_nsec);
   lw->LOG("Average search latency(nsec/op): %.3e (%lu/%lu found)", (double)search_time/(double)numKeys, found_keys, numKeys);
 
-  dsm->set_key("metric", "LATENCY");
-  dsm->set_key("insert_keys", numKeys);
-  dsm->set_key("inserted_keys", numKeys);
-  dsm->set_key("insert_time", insert_time);
-  dsm->set_key("search_keys", numKeys);  
-  dsm->set_key("searched_keys", found_keys);   
-  dsm->set_key("search_time", search_time);  
+  lw->LOG_client_cache_info(tree->get_cache_statistics());
 
-#ifdef PRIVATE_DEBUG
-  fprintf(stdout, "==================== Execution Information ====================\n");   
-  fprintf(stdout, "Total RDMA write request number : %lu\n", rdma_write_num);
-  fprintf(stdout, "Total RDMA write request size(B): %lu\n", rdma_write_size);
-  fprintf(stdout, "Total RDMA read request number : %lu\n", rdma_read_num);
-  fprintf(stdout, "Total RDMA read request size(B): %lu\n", rdma_read_size);
-  fprintf(stdout, "Total RDMA atomic request number : %lu\n", rdma_atomic_num);
-  fprintf(stdout, "Total RDMA atomic request size(B): %lu\n", rdma_atomic_size);
-  fprintf(stdout, "===============================================================\n"); 
-#endif
+  dsm->set_key("metric", "REAL_LATENCY");
+  dsm->set_key("thread_num", 1UL);
+  dsm->set_key("cache_size", (uint64_t)define::kIndexCacheSize);
+  dsm->set_key("bulk_keys", 0UL);
+  dsm->set_key("load_workload_path", workloadPath);
+  dsm->set_key("txn_workload_path", workloadPath);
+  dsm->set_key("load_keys", numKeys);
+  dsm->set_key("load_done_keys", numKeys);
+  dsm->set_key("load_time", insert_time);
+  dsm->set_key("txn_keys", numKeys);
+  dsm->set_key("txn_done_keys", found_keys);
+  dsm->set_key("txn_time", search_time);
 
   delete lw;
-}
-
-void run_ycsb_workload(uint64_t numKeys,  LogWriter *lw) {
-  printf("[NOTICE] Start YCSB Benchmark\n");
-  struct timespec bench_start, bench_end;
-  clock_gettime(CLOCK_REALTIME, &bench_start);
-  
-  uint64_t insert_num = 0;
-  uint64_t search_num = 0;
-  uint64_t scan_num = 0;
-  uint64_t found_num = 0;
-  for (uint64_t i = 0; i < numKeys; ++i) {
-    Request r = requests[i];
-    if (r.is_search) {
-      Value v;
-      tree->search(r.k, v);
-      if (v == key2int(r.k)) found_num++;
-      search_num++;
-    }
-    else if (r.is_update || r.is_insert)  {
-      tree->insert(r.k, r.v,  nullptr, 0, r.is_update);
-      insert_num++;
-    }
-    else {
-      std::map<Key, Value> ret;
-      assert(r.range_size > 0);
-      tree->range_query(r.k, r.k+r.range_size, ret);
-      scan_num++;
-    }
-  }
-  
-  clock_gettime(CLOCK_REALTIME, &bench_end);
-  uint64_t bench_time = (bench_end.tv_sec - bench_start.tv_sec) * 1000000000 + (bench_end.tv_nsec - bench_start.tv_nsec);
-  lw->LOG("Average Bench latency(nsec/op): %.3e", (double)bench_time/(double)numKeys);
-  lw->LOG("INSERT num: %lu", insert_num);
-  lw->LOG("SCAN   num: %lu", scan_num);
-  lw->LOG("SEARCH num: %lu", search_num);
-  lw->LOG("SEARCH found num: %lu", found_num);
-
-  dsm->set_key("metric", "LATENCY");
-  dsm->set_key("insert_keys", numKeys);
-  dsm->set_key("inserted_keys", numKeys);
-  dsm->set_key("insert_time", 0UL);
-  dsm->set_key("search_keys", numKeys);
-  dsm->set_key("searched_keys", found_num);
-  dsm->set_key("search_time", bench_time);
-
-  delete lw;
-}
-
-int main(int argc, char *argv[]) {
-  if (argc != 5) {
-    fprintf(stderr, "[ERROR] Four arguments are required but received %d\n", argc - 1);
-    exit(1);
-  }
-
-  DSMConfig config;
-  config.isCompute = true;
-  config.computeNR = 1;
-  is_ycsb = !!atoi(argv[1]);
-  config.memoryNR = atoi(argv[2]);
-
-  std::string workloadPath = argv[3];
-  uint64_t numKeys = atol(argv[4]);
-
-  /* Start reading keys */
-  std::ifstream ifs;
-  ifs.open(workloadPath);
-
-  if (skip_BOM(ifs)) {
-    printf("[NOTICE] Removed BOM in target workload\n");
-  }
-
-  fprintf(stdout, "[NOTICE] Start reading %lu workloads\n", numKeys);
-  // YCSB workloads
-  if (is_ycsb) {
-    requests.reserve(numKeys);
-
-    std::string op;
-    uint64_t int_key;
-    uint64_t range_size;
-    for (uint64_t i = 0; i < numKeys; ++i) {
-      ifs >> op >> int_key;
-      if (op == "SCAN") ifs >> range_size;
-      Request r;
-      r.is_search = (op == "READ");
-      r.is_insert = (op == "INSERT");
-      r.is_update = (op == "UPDATE");
-      r.range_size = (op == "SCAN") ? range_size : 0;
-      r.k = int2key(int_key);
-      r.v = int_key;
-
-      requests[i] = r;
-    }
-  }
-  // Key-only workloads
-  else {
-    keys.reserve(numKeys);
-    for (uint64_t i = 0; i < numKeys; ++i) {
-      ifs >> keys[i];
-    }
-  }
-
-
-  LogWriter* lw = new LogWriter("COMPUTE");
-  lw->LOG_client_info("Single client", 1, workloadPath, numKeys);
-
-#ifndef PRIVATE_DEBUG
-  fprintf(stdout, "[NOTICE] Start single client benchmark\n");
-#else
-  fprintf(stdout, "[NOTICE] Start single client benchmark (DEBUG mode)\n");
-#endif
-  dsm = DSM::getInstance(config);
-  dsm->registerThread();
-  tree = new Tree(dsm);
-
-  dsm->barrier("benchmark");
-
-  if (is_ycsb) run_ycsb_workload(numKeys, lw);
-  else run_key_only_workload(numKeys, lw);
+  delete tree;
 
   return 0;
 }

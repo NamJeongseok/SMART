@@ -156,4 +156,10 @@ inline void mfence() { asm volatile("mfence" ::: "memory"); }
 
 inline void compiler_barrier() { asm volatile("" ::: "memory"); }
 
+struct CacheStats {
+  uint64_t cache_size;
+  uint64_t free_cache_size;
+  uint64_t cache_node_num ;
+};
+
 #endif /* __COMMON_H__ */

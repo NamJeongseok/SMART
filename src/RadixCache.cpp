@@ -397,3 +397,13 @@ void RadixCache::statistics() {
   }
   printf("consumed cache size = %.3lf MB\n", (double)cache_size - (double)free_manager->remain_size() / define::MB);
 }
+
+CacheStats* RadixCache::get_statistics() {
+  CacheStats* cache_stats = new CacheStats;
+
+  cache_stats->cache_size = cache_size;
+  cache_stats->free_cache_size = free_manager->remain_size();
+  cache_stats->cache_node_num = node_queue->unsafe_size();
+
+  return cache_stats;
+}

@@ -73,7 +73,7 @@ void* run_thread(void* _thread_args) {
     clock_gettime(CLOCK_REALTIME, &load_start); 
   }
 
-  for (size_t i = 0; i < rr_load_requests[tid].size(); ++i) {
+  for (uint64_t i = 0; i < rr_load_requests[tid].size(); ++i) {
     if (rr_load_requests[tid][i].op == OpType::INSERT) {
       tree->insert(rr_load_requests[tid][i].key, key2int(rr_load_requests[tid][i].key));
     } else {
@@ -100,7 +100,7 @@ void* run_thread(void* _thread_args) {
   }
 
   Value v;
-  for (size_t i = 0; i < rr_txn_requests[tid].size(); ++i) { 
+  for (uint64_t i = 0; i < rr_txn_requests[tid].size(); ++i) {
     if (rr_txn_requests[tid][i].op == OpType::INSERT) {
       tree->insert(rr_txn_requests[tid][i].key, key2int(rr_txn_requests[tid][i].key), nullptr, 0, false);
       successed_requests_list[tid]++;
@@ -132,7 +132,7 @@ void* run_thread(void* _thread_args) {
     txn_time_list[tid] = (txn_end.tv_sec - txn_start.tv_sec) * 1000000000 + (txn_end.tv_nsec - txn_start.tv_nsec);
 
     // Wait for all clients to finish insert
-    dsm->barrier("txn");  
+    dsm->barrier("txn");
   }
 
   return NULL;
@@ -169,15 +169,19 @@ int main(int argc, char *argv[]) {
   vector<Key> bulk_keys(bulkNumKeys);
   vector<ClientRequest> load_requests(loadNumKeys - bulkNumKeys);
 
-  /* Start reading keys */
   ifstream load_ifs;
   load_ifs.open(ycsbLoadPath);
+
+  if (!load_ifs.is_open()) {
+    fprintf(stdout, "[ERROR] Failed opening file %s (error: %s)\n", ycsbLoadPath.c_str(), strerror(errno));
+    exit(1);
+  }
 
   if (skip_BOM(load_ifs)) {
     fprintf(stdout, "[NOTICE] Removed BOM in target workload\n");
   }
 
-  fprintf(stdout, "[NOTICE] Start reading %lu keys\n", loadNumKeys);
+  fprintf(stdout, "[NOTICE] Start reading %lu load keys\n", loadNumKeys);
 
   uint64_t k;
   std::string op;
@@ -201,23 +205,13 @@ int main(int argc, char *argv[]) {
     }
   }
 
+  fprintf(stdout, "[NOTICE] Start multi client benchmark\n");
   dsm = DSM::getInstance(config);
-  dsm->registerThread();
-  tree = new Tree(dsm);
-
-  if (dsm->getMyNodeID() == 0) {
-    fprintf(stdout, "[NOTICE] Start bulk loading %lu keys\n", bulkNumKeys);
-    for (size_t i = 0; i < bulk_keys.size(); ++i) {
-      tree->insert(bulk_keys[i], (Value)key2int(bulk_keys[i]));
-    }
-  }
-
-  dsm->resetThread();
-
+  
   fprintf(stdout, "[NOTICE] Start dividing load keys to %d threads (coroutine disabled)\n", threadNum);
   KeyGenerator<ClientRequest, Value> key_gen;
   rr_load_requests = key_gen.gen_key_multi_client(load_requests, loadNumKeys - bulkNumKeys, config.computeNR, threadNum, 1, dsm->getMyNodeID());
-  
+
   load_requests.clear();
   load_requests.shrink_to_fit();
 
@@ -225,6 +219,11 @@ int main(int argc, char *argv[]) {
 
   ifstream txn_ifs;
   txn_ifs.open(ycsbTxnPath);
+
+  if (!txn_ifs.is_open()) {
+    fprintf(stdout, "[ERROR] Failed opening file %s (error: %s)\n", ycsbTxnPath.c_str(), strerror(errno));
+    exit(1);
+  }
 
   if (skip_BOM(txn_ifs)) {
     fprintf(stdout, "[NOTICE] Removed BOM in target txn workload\n");
@@ -256,17 +255,29 @@ int main(int argc, char *argv[]) {
       exit(1);
     }
   }
-
+  
   fprintf(stdout, "[NOTICE] Start dividing txn keys to %lu threads (coroutine disabled)\n", threadNum);
   rr_txn_requests = key_gen.gen_key_multi_client(txn_requests, txnNumKeys, config.computeNR, threadNum, 1, dsm->getMyNodeID());
 
   txn_requests.clear();
-  txn_requests.shrink_to_fit(); 
+  txn_requests.shrink_to_fit();
 
   LogWriter* lw = new LogWriter("COMPUTE");
-  lw->LOG_ycsb_client_info("Mutli client", threadNum, ycsbLoadPath, ycsbTxnPath, loadNumKeys, txnNumKeys);
+  lw->print_ycsb_client_info(threadNum, define::kIndexCacheSize, ycsbLoadPath.c_str(), ycsbTxnPath.c_str(), loadNumKeys - bulkNumKeys, txnNumKeys, bulkNumKeys);
+  lw->LOG_ycsb_client_info(threadNum, define::kIndexCacheSize, ycsbLoadPath.c_str(), ycsbTxnPath.c_str(), loadNumKeys - bulkNumKeys, txnNumKeys, bulkNumKeys);
 
-  fprintf(stdout, "[NOTICE] Start multi client benchmark\n");
+  fprintf(stdout, "[NOTICE] Start initializing index structure\n");
+  dsm->registerThread();
+  tree = new Tree(dsm);
+
+  if (dsm->getMyNodeID() == 0) {
+    fprintf(stdout, "[NOTICE] Start bulk loading %lu keys\n", bulkNumKeys);
+    for (size_t i = 0; i < bulk_keys.size(); ++i) {
+      tree->insert(bulk_keys[i], (Value)key2int(bulk_keys[i]));
+    }
+  }
+
+  dsm->resetThread();
 
   tid_list = new pthread_t[threadNum];
   struct ThreadArgs* thread_args_list = new ThreadArgs[threadNum];
@@ -289,7 +300,7 @@ int main(int argc, char *argv[]) {
     tid_list[i] = tid;
   }
 
-  uint64_t load_time = 0; 
+  uint64_t load_time = 0;
   uint64_t txn_time = 0;
   uint64_t total_load_requests = 0;
   uint64_t total_txn_requests = 0;
@@ -307,17 +318,24 @@ int main(int argc, char *argv[]) {
     total_successed_requests += successed_requests_list[i];
   }
 
-  lw->LOG("Average insert throughput(op/nsec): %.3e", (double)total_load_requests/(double)load_time);
-  lw->LOG("Average search throughput(op/nsec): %.3e (%lu/%lu found)", (double)total_txn_requests/(double)txn_time, total_successed_requests, total_txn_requests);
+  lw->LOG("Average load throughput(op/nsec): %.3e", (double)total_load_requests/(double)load_time);
+  lw->LOG("Average txn throughput(op/nsec): %.3e (%lu/%lu successed)", (double)total_txn_requests/(double)txn_time, total_successed_requests, total_txn_requests);
+
+  lw->LOG_client_cache_info(tree->get_cache_statistics());
 
   dsm->set_key("metric", "YCSB_THROUGHPUT");
-  dsm->set_key("insert_keys", total_load_requests);
-  dsm->set_key("inserted_keys", total_load_requests);
-  dsm->set_key("insert_time", load_time);
-  dsm->set_key("search_keys", total_txn_requests);  
-  dsm->set_key("searched_keys", total_successed_requests);   
-  dsm->set_key("search_time", txn_time);  
-    
+  dsm->set_key("thread_num", (uint64_t)threadNum);
+  dsm->set_key("cache_size", (uint64_t)define::kIndexCacheSize);
+  dsm->set_key("bulk_keys", bulkNumKeys);
+  dsm->set_key("load_workload_path", ycsbLoadPath);
+  dsm->set_key("txn_workload_path", ycsbTxnPath);
+  dsm->set_key("load_keys", total_load_requests);
+  dsm->set_key("load_done_keys", total_load_requests);
+  dsm->set_key("load_time", load_time);
+  dsm->set_key("txn_keys", total_txn_requests);
+  dsm->set_key("txn_done_keys", total_successed_requests);
+  dsm->set_key("txn_time", txn_time);
+
   delete lw;
   delete tree;
 
