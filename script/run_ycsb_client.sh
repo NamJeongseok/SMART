@@ -1,12 +1,12 @@
 #!/bin/bash
 
-computeNR=2
-memoryNR=2
-threadNum=64
-# Path to the directory where YCSB workload exists
-workloadDir=/mnt/data
-# YCSB workload name (e.g., a, b, c or d)
-workloadName=a
+DEBUG=$1
+computeNR=$2
+memoryNR=$3
+threadNum=$4
+cacheSize=$5 # MB
+workloadDir=$6 # Path to the directory where workload exists
+workloadName=$7 # Workload name (e.g., a, b, c, d)
 
 loadWorkloadPath=${workloadDir}/load_randint_workload${workloadName}
 
@@ -32,12 +32,12 @@ if [ ! -f ${txnWorkloadPath} ]; then
   exit 1;  
 fi
 
-if [ ! -d "../build" ]; then
-  mkdir "../build"
+if [ ! -d "./SMART/build" ]; then
+  mkdir "./SMART/build"
 fi
 
 # Compile
-cd ../build
+cd ./SMART/build
 cmake .. && make -j
 
 if [ ! -d "../test/result" ]; then
@@ -51,7 +51,7 @@ txnNumKeys=$(cat ${txnWorkloadPath} | wc -l)
 ../script/hugepage_compute.sh
 
 # Start benchmark
-./benchmark_ycsb_client ${computeNR} ${memoryNR} ${threadNum} ${workloadDir} ${workloadName} ${loadNumKeys} ${txnNumKeys}
+./benchmark_ycsb_client ${computeNR} ${memoryNR} ${threadNum} ${workloadDir} ${workloadName} ${loadNumKeys} ${txnNumKeys} ${cacheSize}
 
 # Clear HugePage
 ../script/clear_hugepage.sh

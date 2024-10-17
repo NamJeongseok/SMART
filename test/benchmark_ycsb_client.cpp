@@ -139,8 +139,8 @@ void* run_thread(void* _thread_args) {
 }
 
 int main(int argc, char *argv[]) {
-  if (argc != 8) {
-    fprintf(stderr, "[ERROR] Seven arguments are required but received %d\n", argc - 1);
+  if (argc != 9) {
+    fprintf(stderr, "[ERROR] Eight arguments are required but received %d\n", argc - 1);
     exit(1);
   }
 
@@ -154,6 +154,7 @@ int main(int argc, char *argv[]) {
   std::string workloadName = argv[5];
   uint64_t loadNumKeys = atol(argv[6]);
   uint64_t txnNumKeys = atol(argv[7]);
+  uint64_t cache_size = atol(argv[8]);
 
   // Should not exceed maximum thread number
   assert(threadNum < MAX_APP_THREAD);
@@ -263,12 +264,12 @@ int main(int argc, char *argv[]) {
   txn_requests.shrink_to_fit();
 
   LogWriter* lw = new LogWriter("COMPUTE");
-  lw->print_ycsb_client_info(threadNum, define::kIndexCacheSize*define::MB, ycsbLoadPath.c_str(), ycsbTxnPath.c_str(), loadNumKeys - bulkNumKeys, txnNumKeys, bulkNumKeys);
-  lw->LOG_ycsb_client_info(threadNum, define::kIndexCacheSize*define::MB, ycsbLoadPath.c_str(), ycsbTxnPath.c_str(), loadNumKeys - bulkNumKeys, txnNumKeys, bulkNumKeys);
+  lw->print_ycsb_client_info(threadNum, cache_size*define::MB, ycsbLoadPath.c_str(), ycsbTxnPath.c_str(), loadNumKeys - bulkNumKeys, txnNumKeys, bulkNumKeys);
+  lw->LOG_ycsb_client_info(threadNum, cache_size*define::MB, ycsbLoadPath.c_str(), ycsbTxnPath.c_str(), loadNumKeys - bulkNumKeys, txnNumKeys, bulkNumKeys);
 
   fprintf(stdout, "[NOTICE] Start initializing index structure\n");
   dsm->registerThread();
-  tree = new Tree(dsm);
+  tree = new Tree(dsm, cache_size);
 
   if (dsm->getMyNodeID() == 0) {
     fprintf(stdout, "[NOTICE] Start bulk loading %lu keys\n", bulkNumKeys);
@@ -325,7 +326,7 @@ int main(int argc, char *argv[]) {
 
   dsm->set_key("metric", "YCSB_THROUGHPUT");
   dsm->set_key("thread_num", (uint64_t)threadNum);
-  dsm->set_key("cache_size", (uint64_t)(define::kIndexCacheSize*define::MB));
+  dsm->set_key("cache_size", (uint64_t)(cache_size*define::MB));
   dsm->set_key("bulk_keys", bulkNumKeys);
   dsm->set_key("load_workload_path", ycsbLoadPath);
   dsm->set_key("txn_workload_path", ycsbTxnPath);
@@ -335,6 +336,8 @@ int main(int argc, char *argv[]) {
   dsm->set_key("txn_keys", total_txn_requests);
   dsm->set_key("txn_done_keys", total_successed_requests);
   dsm->set_key("txn_time", txn_time);
+
+  dsm->faa("end");
 
   delete lw;
   delete tree;

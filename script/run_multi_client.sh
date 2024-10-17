@@ -1,21 +1,27 @@
 #!/bin/bash
 
-computeNR=2
-memoryNR=2
-threadNum=64
-workloadPath=/mnt/data/review-82M-v2.csv
+DEBUG=$1
+computeNR=$2
+memoryNR=$3
+threadNum=$4
+cacheSize=$5 # MB
+workloadDir=$6 # Path to the directory where workload exists
+workloadName=$7 # Workload name
+
+
+workloadPath=${workloadDir}/${workloadName}
 
 if [ ! -f ${workloadPath} ]; then
   echo "[ERROR] No workload named ${workloadPath}"
   exit 1;  
 fi
 
-if [ ! -d "../build" ]; then
-  mkdir ../build
+if [ ! -d "./SMART/build" ]; then
+	mkdir ./SMART/build
 fi
 
 # Compile
-cd ../build
+cd ./SMART/build
 cmake .. && make -j
 
 if [ ! -d "../test/result" ]; then
@@ -28,7 +34,7 @@ numKeys=$(cat ${workloadPath} | wc -l)
 ../script/hugepage_compute.sh
 
 # Start benchmark
-./benchmark_multi_client ${computeNR} ${memoryNR} ${threadNum} ${workloadPath} ${numKeys}
+./benchmark_multi_client ${computeNR} ${memoryNR} ${threadNum} ${workloadPath} ${numKeys} ${cacheSize}
 
 # Clear HugePage
 ../script/clear_hugepage.sh

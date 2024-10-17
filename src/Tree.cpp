@@ -38,13 +38,13 @@ thread_local CoroCall Tree::master;
 thread_local CoroQueue Tree::busy_waiting_queue;
 
 
-Tree::Tree(DSM *dsm, uint16_t tree_id) : dsm(dsm), tree_id(tree_id) {
+Tree::Tree(DSM *dsm, uint64_t cache_size, uint16_t tree_id) : dsm(dsm), tree_id(tree_id) {
   assert(dsm->is_register());
 
 #ifdef TREE_ENABLE_CACHE
   // init local cache
 // #ifdef CACHE_ENABLE_ART
-  index_cache = new RadixCache(define::kIndexCacheSize, dsm);
+  index_cache = new RadixCache(cache_size, dsm);
 // #else
 //   index_cache = new NormalCache(define::kIndexCacheSize, dsm);
 // #endif

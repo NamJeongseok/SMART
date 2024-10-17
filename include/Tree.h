@@ -58,7 +58,7 @@ enum {
 
 class Tree {
 public:
-  Tree(DSM *dsm, uint16_t tree_id = 0);
+  Tree(DSM *dsm, uint64_t cache_size = define::kIndexCacheSize, uint16_t tree_id = 0);
   ~Tree(void);
 
   using WorkFunc = std::function<void (Tree *, const Request&, CoroContext *, int)>;

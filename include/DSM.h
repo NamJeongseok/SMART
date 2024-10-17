@@ -171,7 +171,20 @@ public:
     return size;
   }
 
-  /* Added for logging purpose. */
+  /* JY: Added for server termination. */
+  void faa(const std::string &key) {
+    keeper->memFetchAndAdd(key.c_str(), key.size());
+  }
+
+  void init_key(const std::string &key) {
+    keeper->memSet(key.c_str(), key.size(), "0", 1);
+  }
+
+  uint64_t get_key(const std::string &key) {
+    return std::stoull(keeper->memGet(key.c_str(), key.size()));
+  }
+
+  /* JY: Added for logging purpose. */
   void set_key(const std::string &key, const std::string &value) {
     std::string k = key + std::to_string(keeper->getMyNodeID());
     keeper->memSet(k.c_str(), k.size(), value.c_str(), value.size());

@@ -1,14 +1,14 @@
 #! /bin/bash
 
-computeNR=2
-memoryNR=2
+computeNR=$1
+memoryNR=$2
 
-if [ ! -d "../build" ]; then
-	mkdir ../build
+if [ ! -d "./SMART/build" ]; then
+	mkdir ./SMART/build
 fi
 
 # Compile
-cd ../build
+cd ./SMART/build
 cmake .. && make -j
 
 if [ ! -d "../test/result" ]; then

@@ -1,13 +1,13 @@
 #!/bin/bash
 
-addr=$(head -1 ../memcached.conf)
-port=$(awk 'NR==2{print}' ../memcached.conf)
+addr=$(head -1 ./SMART/memcached.conf)
+port=$(awk 'NR==2{print}' ./SMART/memcached.conf)
 
 # kill old me
 pkill -9 -f memcached
 
 # launch memcached
-memcached -u root -l ${addr} -p  ${port} -c 10000 -d -P /tmp/memcached.pid
+memcached -u root -l ${addr} -p ${port} -c 10000 -d -P /tmp/memcached.pid
 sleep 1
 
 # init 

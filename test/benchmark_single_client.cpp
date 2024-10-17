@@ -19,8 +19,8 @@ DSM *dsm;
 Tree *tree;
 
 int main(int argc, char *argv[]) {
-  if (argc != 4) {
-    fprintf(stderr, "[ERROR] Three arguments are required but received %d\n", argc - 1);
+  if (argc != 5) {
+    fprintf(stderr, "[ERROR] Four arguments are required but received %d\n", argc - 1);
     exit(1);
   }
 
@@ -31,6 +31,7 @@ int main(int argc, char *argv[]) {
 
   std::string workloadPath = argv[2];
   uint64_t numKeys = atol(argv[3]);
+  uint64_t cache_size = atol(argv[4]);
 
   std::ifstream ifs;
   ifs.open(workloadPath);
@@ -54,15 +55,15 @@ int main(int argc, char *argv[]) {
   }
 
   LogWriter* lw = new LogWriter("COMPUTE");
-  lw->print_client_info(1, define::kIndexCacheSize*define::MB, workloadPath.c_str(), 0, numKeys, numKeys);
-  lw->LOG_client_info(1, define::kIndexCacheSize*define::MB, workloadPath.c_str(), 0, numKeys, numKeys);
+  lw->print_client_info(1, cache_size*define::MB, workloadPath.c_str(), 0, numKeys, numKeys);
+  lw->LOG_client_info(1, cache_size*define::MB, workloadPath.c_str(), 0, numKeys, numKeys);
 
   fprintf(stdout, "[NOTICE] Start single client benchmark\n");
   dsm = DSM::getInstance(config);
 
   fprintf(stdout, "[NOTICE] Start initializing index structure\n");
   dsm->registerThread();
-  tree = new Tree(dsm);
+  tree = new Tree(dsm, cache_size);
 
   dsm->barrier("benchmark");
 
@@ -97,7 +98,7 @@ int main(int argc, char *argv[]) {
 
   dsm->set_key("metric", "REAL_LATENCY");
   dsm->set_key("thread_num", 1UL);
-  dsm->set_key("cache_size", (uint64_t)(define::kIndexCacheSize*define::MB));
+  dsm->set_key("cache_size", (uint64_t)(cache_size*define::MB));
   dsm->set_key("bulk_keys", 0UL);
   dsm->set_key("load_workload_path", workloadPath);
   dsm->set_key("txn_workload_path", workloadPath);
@@ -107,6 +108,8 @@ int main(int argc, char *argv[]) {
   dsm->set_key("txn_keys", numKeys);
   dsm->set_key("txn_done_keys", found_keys);
   dsm->set_key("txn_time", search_time);
+
+  dsm->faa("end");
 
   delete lw;
   delete tree;

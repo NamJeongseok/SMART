@@ -109,12 +109,17 @@ int main(int argc, char *argv[]) {
   config.memoryNR = atoi(argv[2]);
 
   DSM* dsm = DSM::getInstance(config);
+  
+  if (dsm->getMyNodeID() == 0) {
+    dsm->init_key("end");
+  }
 
-  fprintf(stdout, "===================== Starting Server %d =====================\n", dsm->getMyNodeID());
+  fprintf(stdout, "===================== Starting Server %d =====================\n", dsm->getMyNodeID());  
   fprintf(stdout, "[NOTICE] computeNR: %d / memoryNR: %d\n", config.computeNR, config.memoryNR);
 
-  fprintf(stdout, "[NOTICE] Enter anything to end server\n");
-  getchar();
+  while (dsm->get_key("end") != dsm->getComputeNR()) {
+    continue;
+  }
 
   if (dsm->getMyNodeID() == 0) {
     log_stats(dsm);
