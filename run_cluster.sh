@@ -62,7 +62,7 @@ do
         fi     
 
         echo "[NOTICE] Start memory server at IP address ${SERVER_IPS[${i}]}"
-        run_command="sudo ${script_path}/run_memory.sh ${computeNR} ${memoryNR}"
+        run_command="sudo ${script_path}/run_server.sh ${computeNR} ${memoryNR}"
         echo "${USER_PASSWD}" | ssh -tt -p ${PORT} ${USER_ID}@${SERVER_IPS[${i}]} "(${run_command})" > /dev/null 2>&1 &
       done
 
