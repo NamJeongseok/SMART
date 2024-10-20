@@ -19,13 +19,17 @@
 /*
   Workloads
 */
+enum OpType : uint8_t {
+  INSERT,
+  SEARCH,
+  UPDATE,
+  SCAN
+};
+
 struct Request {
-  bool is_search;
-  bool is_insert;
-  bool is_update;
-  Key k;
-  Value v;
-  int range_size;
+  OpType op;
+  uint64_t range_size;
+  Key key;
 };
 
 
@@ -33,6 +37,8 @@ class RequstGen {
 public:
   RequstGen() = default;
   virtual Request next() { return Request{}; }
+  virtual std::vector<Request>::const_iterator current_it() { return std::vector<Request>::const_iterator(0); }
+  virtual std::vector<Request>::const_iterator end_it() { return std::vector<Request>::const_iterator(0); }
 };
 
 
@@ -40,6 +46,8 @@ public:
   Tree
 */
 using GenFunc = std::function<RequstGen *(DSM*, Request*, int, int, int)>;
+using CustomCoroFunc = std::function<RequstGen* (int, DSM *, int, const std::vector<Request>&)>;
+
 #define MAX_FLAG_NUM 12
 enum {
   FIRST_TRY,
@@ -61,8 +69,12 @@ public:
   Tree(DSM *dsm, uint64_t cache_size = define::kIndexCacheSize, uint16_t tree_id = 0);
   ~Tree(void);
 
-  using WorkFunc = std::function<void (Tree *, const Request&, CoroContext *, int)>;
-  void run_coroutine(GenFunc gen_func, WorkFunc work_func, int coro_cnt, Request* req = nullptr, int req_num = 0);
+  //using WorkFunc = std::function<void (Tree *, const Request&, CoroContext *, int)>;
+  //void run_coroutine(GenFunc gen_func, WorkFunc work_func, int coro_cnt, Request* req = nullptr, int req_num = 0);
+  
+  /* JY: Added for custom coroutine execution. */
+  using WorkFunc = std::function<void (Tree*, const Request&, int, CoroContext*, int)>;
+  void custom_run_coroutine(CustomCoroFunc func, int coro_cnt, WorkFunc work_func, const std::vector<Request>& requests); 
 
   void insert(const Key &k, Value v, CoroContext *cxt = nullptr, int coro_id = 0, bool is_update = false, bool is_load = false);
   bool search(const Key &k, Value &v, CoroContext *cxt = nullptr, int coro_id = 0);
@@ -75,8 +87,10 @@ public:
   InternalEntry get_root_ptr(CoroContext *cxt, int coro_id);
 
 private:
-  void coro_worker(CoroYield &yield, RequstGen *gen, WorkFunc work_func, int coro_id);
-  void coro_master(CoroYield &yield, int coro_cnt);
+  //void coro_worker(CoroYield &yield, RequstGen *gen, WorkFunc work_func, int coro_id);
+  void custom_coro_worker(CoroYield &yield, RequstGen *gen, int coro_id, WorkFunc work_func);
+  //void coro_master(CoroYield &yield, int coro_cnt);
+  void custom_coro_master(CoroYield &yield, int coro_cnt);
 
   bool read_leaf(const GlobalAddress &leaf_addr, char *leaf_buffer, int leaf_size, const GlobalAddress &p_ptr, bool from_cache, CoroContext *cxt, int coro_id);
   void in_place_update_leaf(const Key &k, Value &v, const GlobalAddress &leaf_addr, Leaf *leaf,

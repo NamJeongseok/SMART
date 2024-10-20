@@ -33,6 +33,7 @@ uint64_t latency[MAX_APP_THREAD][MAX_CORO_NUM][LATENCY_WINDOWS];
 volatile bool need_stop = false;
 uint64_t retry_cnt[MAX_APP_THREAD][MAX_FLAG_NUM];
 
+thread_local bool* coroutine_done;
 thread_local CoroCall Tree::worker[MAX_CORO_NUM];
 thread_local CoroCall Tree::master;
 thread_local CoroQueue Tree::busy_waiting_queue;
@@ -1415,7 +1416,7 @@ void Tree::range_query_on_page(InternalPage* page, bool from_cache, int depth,
 }
 
 
-void Tree::run_coroutine(GenFunc gen_func, WorkFunc work_func, int coro_cnt, Request* req, int req_num) {
+/*void Tree::run_coroutine(GenFunc gen_func, WorkFunc work_func, int coro_cnt, Request* req, int req_num) {
   using namespace std::placeholders;
 
   assert(coro_cnt <= MAX_CORO_NUM);
@@ -1427,10 +1428,25 @@ void Tree::run_coroutine(GenFunc gen_func, WorkFunc work_func, int coro_cnt, Req
   master = CoroCall(std::bind(&Tree::coro_master, this, _1, coro_cnt));
 
   master();
+}*/
+
+void Tree::custom_run_coroutine(CustomCoroFunc func, int coro_cnt, WorkFunc work_func, const std::vector<Request>& requests) {
+  using namespace std::placeholders;
+
+  coroutine_done = new bool[coro_cnt]{false};
+
+  assert(coro_cnt <= MAX_CORO_NUM);
+  for (int i = 0; i < coro_cnt; ++i) {
+    auto gen = func(i, dsm, coro_cnt, requests);
+    worker[i] = CoroCall(std::bind(&Tree::custom_coro_worker, this, _1, gen, i, work_func));
+  }
+
+  master = CoroCall(std::bind(&Tree::custom_coro_master, this, _1, coro_cnt));
+
+  master();
 }
 
-
-void Tree::coro_worker(CoroYield &yield, RequstGen *gen, WorkFunc work_func, int coro_id) {
+/*void Tree::coro_worker(CoroYield &yield, RequstGen *gen, WorkFunc work_func, int coro_id) {
   CoroContext ctx;
   ctx.coro_id = coro_id;
   ctx.master = &master;
@@ -1451,10 +1467,32 @@ void Tree::coro_worker(CoroYield &yield, RequstGen *gen, WorkFunc work_func, int
     }
     latency[thread_id][coro_id][us_10]++;
   }
+}*/
+
+void Tree::custom_coro_worker(CoroYield &yield, RequstGen *gen, int coro_id, WorkFunc work_func) {
+  CoroContext ctx;
+  ctx.coro_id = coro_id;
+  ctx.master = &master;
+  ctx.yield = &yield;
+
+  auto thread_id = dsm->getMyThreadID();
+
+  while (true) {
+    auto r = gen->next();
+    work_func(this, r, thread_id, &ctx, coro_id);
+    if (gen->current_it() == gen->end_it()) {
+      break;
+    }
+  }
+
+  coroutine_done[coro_id] = true;
+
+  while (true) { 
+    yield(master);
+  }
 }
 
-
-void Tree::coro_master(CoroYield &yield, int coro_cnt) {
+/*void Tree::coro_master(CoroYield &yield, int coro_cnt) {
   for (int i = 0; i < coro_cnt; ++i) {
     yield(worker[i]);
   }
@@ -1484,8 +1522,42 @@ void Tree::coro_master(CoroYield &yield, int coro_cnt) {
       }
     }
   }
-}
+}*/
 
+void Tree::custom_coro_master(CoroYield &yield, int coro_cnt) {
+
+  for (int i = 0; i < coro_cnt; ++i) {
+    yield(worker[i]);
+  }
+
+  while (true) {
+
+    uint64_t next_coro_id;
+
+    if (dsm->poll_rdma_cq_once(next_coro_id)) {
+      yield(worker[next_coro_id]);
+    }
+   
+    if (!busy_waiting_queue.empty()) {
+      auto next = busy_waiting_queue.front();
+      busy_waiting_queue.pop();
+      next_coro_id = next.first;
+      if (next.second()) {
+        yield(worker[next_coro_id]);
+      } else {
+        busy_waiting_queue.push(next);
+      }
+    }
+
+    for (int i = 0; i < coro_cnt; ++i) {
+      if (!coroutine_done[i]) {
+        break;
+      } else if (i == coro_cnt-1) {
+        return;
+      }
+    }
+  }
+}
 
 void Tree::statistics() {
 #ifdef TREE_ENABLE_CACHE

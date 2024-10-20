@@ -14,23 +14,13 @@
 #include <string>
 #include <fstream>
 
-enum OpType : uint8_t {
-  INSERT,
-  SEARCH,
-  UPDATE,
-  SCAN
-};
-
-struct ClientRequest {
-  OpType op;
-  uint64_t range_size;
-  Key key;
-};
-
 //////////////////// workload parameters /////////////////////
+//#define USE_CORO
+//const int kCoroCnt = 3;
+
 int threadNum;
-std::vector<ClientRequest>* rr_load_requests;
-std::vector<ClientRequest>* rr_txn_requests;
+std::vector<Request>* rr_load_requests;
+std::vector<Request>* rr_txn_requests;
 //////////////////// workload parameters /////////////////////
 
 DSM *dsm;
@@ -50,6 +40,79 @@ uint64_t* txn_time_list;
 struct ThreadArgs {
   int tid;
 };
+
+class RequsetGenBench : public RequstGen {
+public:
+  RequsetGenBench(int coro_id, DSM *dsm, int coro_cnt, const std::vector<Request>& requests)
+  : coro_id(coro_id), dsm(dsm), requests(requests) {
+    start = requests.begin();
+    uint64_t requests_per_coroutine = requests.size()/coro_cnt;
+
+    for (int i = 0; i < coro_id; ++i) {
+      start += (i < requests.size()%coro_cnt) ? requests_per_coroutine+1 : requests_per_coroutine;
+    }
+
+    end = (coro_id < requests.size()%coro_cnt) ? start+requests_per_coroutine+1 : start+requests_per_coroutine;
+  }
+
+  Request next() override {
+    Request r = *start;
+    start++;
+
+    return r;
+  }
+
+  std::vector<Request>::const_iterator current_it() {
+    return start;
+  }
+
+  std::vector<Request>::const_iterator end_it() {
+    return end;
+  }
+
+private:
+  int coro_id;
+  DSM *dsm;
+
+  std::vector<Request> requests;
+  std::vector<Request>::const_iterator start;
+  std::vector<Request>::const_iterator end;
+};
+
+RequstGen* coro_func(int coro_id, DSM *dsm, int coro_cnt, const std::vector<Request>& requests) {
+  return new RequsetGenBench(coro_id, dsm, coro_cnt, requests);
+}
+
+void load_func(Tree *tree, const Request& r, int tid, CoroContext *ctx = nullptr, int coro_id = 0) {
+  if (r.op == OpType::INSERT) {
+    tree->insert(r.key, key2int(r.key), ctx, coro_id, false, true);
+  } else {
+    assert(false);
+  }
+}
+
+void txn_func(Tree *tree, const Request& r, int tid, CoroContext *ctx = nullptr, int coro_id = 0) {
+  if (r.op == OpType::INSERT) {
+    tree->insert(r.key, key2int(r.key), ctx, coro_id, false);
+    successed_requests_list[tid]++;
+  } else if (r.op == OpType::SEARCH) {
+    Value v;
+    auto ret = tree->search(r.key, v);
+    if (ret && v == key2int(r.key)) {
+      successed_requests_list[tid]++;
+    }
+  } else if (r.op == OpType::UPDATE) {
+    tree->insert(r.key, key2int(r.key), ctx, coro_id, true);
+    successed_requests_list[tid]++;
+  } else if (r.op == OpType::SCAN) {
+    assert(r.range_size > 0);
+    std::map<Key, Value> ret;
+    tree->range_query(r.key, r.key + r.range_size, ret);
+    successed_requests_list[tid]++;
+  } else {
+    assert(false);
+  }
+}
 
 void* run_thread(void* _thread_args) {
   struct ThreadArgs* thread_args = (struct ThreadArgs*)_thread_args;
@@ -73,13 +136,13 @@ void* run_thread(void* _thread_args) {
     clock_gettime(CLOCK_REALTIME, &load_start); 
   }
 
+#ifdef USE_CORO
+  tree->custom_run_coroutine(coro_func, kCoroCnt, load_func, rr_load_requests[tid]); 
+#else
   for (uint64_t i = 0; i < rr_load_requests[tid].size(); ++i) {
-    if (rr_load_requests[tid][i].op == OpType::INSERT) {
-      tree->insert(rr_load_requests[tid][i].key, key2int(rr_load_requests[tid][i].key));
-    } else {
-      assert(false);
-    }
+    load_func(tree, rr_load_requests[tid][i], tid);
   }
+#endif
 
   // Wait for all the threads to finish insert
   pthread_barrier_wait(&load_done_barrier);
@@ -99,28 +162,13 @@ void* run_thread(void* _thread_args) {
     clock_gettime(CLOCK_REALTIME, &txn_start);    
   }
 
-  Value v;
+#ifdef USE_CORO
+  tree->custom_run_coroutine(coro_func, kCoroCnt, txn_func, rr_txn_requests[tid]); 
+#else
   for (uint64_t i = 0; i < rr_txn_requests[tid].size(); ++i) {
-    if (rr_txn_requests[tid][i].op == OpType::INSERT) {
-      tree->insert(rr_txn_requests[tid][i].key, key2int(rr_txn_requests[tid][i].key), nullptr, 0, false);
-      successed_requests_list[tid]++;
-    } else if (rr_txn_requests[tid][i].op == OpType::SEARCH) {
-      auto ret = tree->search(rr_txn_requests[tid][i].key, v);
-      if (ret && v == key2int(rr_txn_requests[tid][i].key)) {
-        successed_requests_list[tid]++;
-      }
-    } else if (rr_txn_requests[tid][i].op == OpType::UPDATE) {
-      tree->insert(rr_txn_requests[tid][i].key, key2int(rr_txn_requests[tid][i].key), nullptr, 0, true);
-      successed_requests_list[tid]++;
-    } else if (rr_txn_requests[tid][i].op == OpType::SCAN) {
-      assert(rr_txn_requests[tid][i].range_size > 0);
-      std::map<Key, Value> ret;
-      tree->range_query(rr_txn_requests[tid][i].key, rr_txn_requests[tid][i].key + rr_txn_requests[tid][i].range_size, ret);
-      successed_requests_list[tid]++;
-    } else {
-      assert(false);
-    }
+    txn_func(tree, rr_txn_requests[tid][i], tid);
   }
+#endif
 
   // Wait for all the threads to finish search
   pthread_barrier_wait(&txn_done_barrier);
@@ -165,10 +213,10 @@ int main(int argc, char *argv[]) {
     ycsbTxnPath += "_new";
   } 
 
-  uint64_t bulkNumKeys = 102400;
+  uint64_t numBulkKeys = 102400;
 
-  vector<Key> bulk_keys(bulkNumKeys);
-  vector<ClientRequest> load_requests(loadNumKeys - bulkNumKeys);
+  vector<Request> bulk_requests(numBulkKeys);
+  vector<Request> load_requests(loadNumKeys - numBulkKeys);
 
   ifstream load_ifs;
   load_ifs.open(ycsbLoadPath);
@@ -186,37 +234,35 @@ int main(int argc, char *argv[]) {
 
   uint64_t k;
   std::string op;
-  for (uint64_t i = 0; i < bulkNumKeys; ++i) {
+  for (uint64_t i = 0; i < numBulkKeys; ++i) {
     load_ifs >> op >> k;
 
     assert(op == "INSERT");
-    bulk_keys[i] = int2key(k);
+    bulk_requests[i].op = OpType::INSERT;
+    bulk_requests[i].range_size = 0;
+    bulk_requests[i].key = int2key(k);
   }
 
-  for (uint64_t i = 0; i < loadNumKeys - bulkNumKeys; ++i) {
+  for (uint64_t i = 0; i < loadNumKeys - numBulkKeys; ++i) {
     load_ifs >> op >> k;
 
-    if (op == "INSERT") {
-      load_requests[i].op = OpType::INSERT;
-      load_requests[i].range_size = 0;
-      load_requests[i].key = int2key(k);
-    } else {
-      fprintf(stdout, "[ERROR] Wrong operation type '%s' detected in load file\n", op.c_str());
-      exit(1);
-    }
+    assert(op == "INSERT");
+    load_requests[i].op = OpType::INSERT;
+    load_requests[i].range_size = 0;
+    load_requests[i].key = int2key(k);
   }
 
   fprintf(stdout, "[NOTICE] Start multi client benchmark\n");
   dsm = DSM::getInstance(config);
   
   fprintf(stdout, "[NOTICE] Start dividing load keys to %d threads (coroutine disabled)\n", threadNum);
-  KeyGenerator<ClientRequest, Value> key_gen;
-  rr_load_requests = key_gen.gen_key_multi_client(load_requests, loadNumKeys - bulkNumKeys, config.computeNR, threadNum, 1, dsm->getMyNodeID());
+  KeyGenerator<Request, Value> key_gen;
+  rr_load_requests = key_gen.gen_key_multi_client(load_requests, loadNumKeys - numBulkKeys, config.computeNR, threadNum, 1, dsm->getMyNodeID());
 
   load_requests.clear();
   load_requests.shrink_to_fit();
 
-  vector<ClientRequest> txn_requests(txnNumKeys); 
+  vector<Request> txn_requests(txnNumKeys); 
 
   ifstream txn_ifs;
   txn_ifs.open(ycsbTxnPath);
@@ -264,17 +310,17 @@ int main(int argc, char *argv[]) {
   txn_requests.shrink_to_fit();
 
   LogWriter* lw = new LogWriter("COMPUTE");
-  lw->print_ycsb_client_info(threadNum, cache_size*define::MB, ycsbLoadPath.c_str(), ycsbTxnPath.c_str(), loadNumKeys - bulkNumKeys, txnNumKeys, bulkNumKeys);
-  lw->LOG_ycsb_client_info(threadNum, cache_size*define::MB, ycsbLoadPath.c_str(), ycsbTxnPath.c_str(), loadNumKeys - bulkNumKeys, txnNumKeys, bulkNumKeys);
+  lw->print_ycsb_client_info(threadNum, cache_size*define::MB, ycsbLoadPath.c_str(), ycsbTxnPath.c_str(), loadNumKeys - numBulkKeys, txnNumKeys, numBulkKeys);
+  lw->LOG_ycsb_client_info(threadNum, cache_size*define::MB, ycsbLoadPath.c_str(), ycsbTxnPath.c_str(), loadNumKeys - numBulkKeys, txnNumKeys, numBulkKeys);
 
   fprintf(stdout, "[NOTICE] Start initializing index structure\n");
   dsm->registerThread();
   tree = new Tree(dsm, cache_size);
 
   if (dsm->getMyNodeID() == 0) {
-    fprintf(stdout, "[NOTICE] Start bulk loading %lu keys\n", bulkNumKeys);
-    for (size_t i = 0; i < bulk_keys.size(); ++i) {
-      tree->insert(bulk_keys[i], (Value)key2int(bulk_keys[i]));
+    fprintf(stdout, "[NOTICE] Start bulk loading %lu keys\n", numBulkKeys);
+    for (uint64_t i = 0; i < bulk_requests.size(); ++i) {
+      tree->insert(bulk_requests[i].key, (Value)key2int(bulk_requests[i].key));
     }
   }
 
@@ -327,7 +373,7 @@ int main(int argc, char *argv[]) {
   dsm->set_key("metric", "YCSB_THROUGHPUT");
   dsm->set_key("thread_num", (uint64_t)threadNum);
   dsm->set_key("cache_size", (uint64_t)(cache_size*define::MB));
-  dsm->set_key("bulk_keys", bulkNumKeys);
+  dsm->set_key("bulk_keys", numBulkKeys);
   dsm->set_key("load_workload_path", ycsbLoadPath);
   dsm->set_key("txn_workload_path", ycsbTxnPath);
   dsm->set_key("load_keys", total_load_requests);

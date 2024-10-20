@@ -15,10 +15,12 @@
 #include <fstream>
 
 //////////////////// workload parameters /////////////////////
+//#define USE_CORO
+//const int kCoroCnt = 3;
+
 int threadNum;
-std::vector<Key> s_keys;
-std::vector<Key>* rr_i_keys;
-std::vector<Key>* rr_s_keys;
+std::vector<Request>* rr_i_requests;
+std::vector<Request>* rr_s_requests;
 //////////////////// workload parameters /////////////////////
 
 DSM *dsm;
@@ -41,55 +43,57 @@ struct ThreadArgs {
 
 class RequsetGenBench : public RequstGen {
 public:
-  RequsetGenBench(int coro_id, DSM *dsm, int id, int coro_cnt, const std::vector<Key>& keys, bool is_search)
-  : coro_id(coro_id), dsm(dsm), id(id), keys(keys), is_search(is_search) {
-    start = keys.begin();
-    uint64_t keys_per_coroutine = keys.size()/coro_cnt;
+  RequsetGenBench(int coro_id, DSM *dsm, int coro_cnt, const std::vector<Request>& requests)
+  : coro_id(coro_id), dsm(dsm), requests(requests) {
+    start = requests.begin();
+    uint64_t requests_per_coroutine = requests.size()/coro_cnt;
 
     for (int i = 0; i < coro_id; ++i) {
-      start += (i < keys.size()%coro_cnt) ? keys_per_coroutine+1 : keys_per_coroutine;
+      start += (i < requests.size()%coro_cnt) ? requests_per_coroutine+1 : requests_per_coroutine;
     }
 
-    end = (coro_id < keys.size()%coro_cnt) ? start+keys_per_coroutine+1 : start+keys_per_coroutine;
+    end = (coro_id < requests.size()%coro_cnt) ? start+requests_per_coroutine+1 : start+requests_per_coroutine;
   }
 
   Request next() override {
-    if (start == end) {
-      Request r;
-      
-      r.k = *keys.end();
-
-      return r;
-    }
-
-    Request r;
-
-    r.k = *start;
-    r.v = (Value)key2int(r.k);
-    r.is_search = is_search;
-
+    Request r = *start;
     start++;
 
     return r;
   }
 
+  std::vector<Request>::const_iterator current_it() {
+    return start;
+  }
+
+  std::vector<Request>::const_iterator end_it() {
+    return end;
+  }
+
 private:
   int coro_id;
   DSM *dsm;
-  int id;
 
-  bool is_search;
-  std::vector<Key> keys;
-  std::vector<Key>::const_iterator start;
-  std::vector<Key>::const_iterator end;
+  std::vector<Request> requests;
+  std::vector<Request>::const_iterator start;
+  std::vector<Request>::const_iterator end;
 };
 
-RequstGen* coro_insert_func(int coro_id, DSM *dsm, int id, int coro_cnt, const std::vector<Key>& keys) {
-  return new RequsetGenBench(coro_id, dsm, id, coro_cnt, keys, false);
+RequstGen* coro_func(int coro_id, DSM *dsm, int coro_cnt, const std::vector<Request>& requests) {
+  return new RequsetGenBench(coro_id, dsm, coro_cnt, requests);
 }
 
-RequstGen* coro_search_func(int coro_id, DSM *dsm, int id, int coro_cnt, const std::vector<Key>& keys) {
-  return new RequsetGenBench(coro_id, dsm, id, coro_cnt, keys, true);
+
+void insert_func(Tree *tree, const Request& r, int tid, CoroContext *ctx = nullptr, int coro_id = 0) {
+  tree->insert(r.key, (Value)key2int(r.key), ctx, coro_id);
+}
+
+void search_func(Tree *tree, const Request& r, int tid, CoroContext *ctx = nullptr, int coro_id = 0) {
+  Value v;
+  auto ret = tree->search(r.key, v);
+  if (ret && v == (Value)key2int(r.key)) {
+    found_keys_list[tid]++;
+  }
 }
 
 void* run_thread(void* _thread_args) {
@@ -114,9 +118,13 @@ void* run_thread(void* _thread_args) {
     clock_gettime(CLOCK_REALTIME, &insert_start); 
   }
 
-  for (uint64_t i = 0; i < rr_i_keys[tid].size(); ++i) {
-    tree->insert(rr_i_keys[tid][i], (Value)key2int(rr_i_keys[tid][i]));
+#ifdef USE_CORO
+  tree->custom_run_coroutine(coro_func, kCoroCnt, insert_func, rr_i_requests[tid]);
+#else
+  for (uint64_t i = 0; i < rr_i_requests[tid].size(); ++i) {
+    insert_func(tree, rr_i_requests[tid][i], tid);
   }
+#endif
 
   // Wait for all the threads to finish insert
   pthread_barrier_wait(&insert_done_barrier);
@@ -136,13 +144,13 @@ void* run_thread(void* _thread_args) {
     clock_gettime(CLOCK_REALTIME, &search_start);    
   }
 
-  Value v;
-  for (uint64_t i = 0; i < rr_s_keys[tid].size(); ++i) {
-    auto ret = tree->search(rr_s_keys[tid][i], v);
-    if (ret && v == (Value)key2int(rr_s_keys[tid][i])) {
-      found_keys_list[tid]++;
-    }
+#ifdef USE_CORO
+  tree->custom_run_coroutine(coro_func, kCoroCnt, search_func, rr_s_requests[tid]);
+#else
+  for (uint64_t i = 0; i < rr_s_requests[tid].size(); ++i) {
+    search_func(tree, rr_s_requests[tid][i], tid);
   }
+#endif
 
   // Wait for all the threads to finish search
   pthread_barrier_wait(&search_done_barrier);
@@ -179,6 +187,8 @@ int main(int argc, char *argv[]) {
   // Should not exceed maximum thread number
   assert(threadNum < MAX_APP_THREAD);
 
+  vector<Request> s_requests(numKeys); 
+
   ifstream ifs;
   ifs.open(workloadPath);
 
@@ -196,26 +206,30 @@ int main(int argc, char *argv[]) {
   uint64_t k;
   for (uint64_t i = 0; i < numKeys; ++i) {
     ifs >> k;
-    s_keys.push_back(int2key(k));
+    s_requests[i].key = int2key(k);
   }
 
   uint64_t numBulkKeys = 102400;
-  vector<Key> b_keys(s_keys.begin(), s_keys.begin() + numBulkKeys);
-
-  uint64_t numInsertKeys = numKeys - numBulkKeys;
-  vector<Key> i_keys(s_keys.begin() + numBulkKeys, s_keys.end());
+  vector<Request> bulk_requests(s_requests.begin(), s_requests.begin() + numBulkKeys);
+  vector<Request> i_requests(s_requests.begin() + numBulkKeys, s_requests.end());
 
   fprintf(stdout, "[NOTICE] Start multi client benchmark\n");
   dsm = DSM::getInstance(config);
 
   fprintf(stdout, "[NOTICE] Start dividing keys to %d threads (coroutine disabled)\n", threadNum);
-  KeyGenerator<Key, Value> key_gen;
-  rr_i_keys = key_gen.gen_key_multi_client(i_keys, numInsertKeys, config.computeNR, threadNum, 1, dsm->getMyNodeID());
-  rr_s_keys = key_gen.gen_key_multi_client(s_keys, numKeys, config.computeNR, threadNum, 1, dsm->getMyNodeID()); 
+  KeyGenerator<Request, Value> key_gen;
+  rr_i_requests = key_gen.gen_key_multi_client(i_requests, numKeys - numBulkKeys, config.computeNR, threadNum, 1, dsm->getMyNodeID());
+  rr_s_requests = key_gen.gen_key_multi_client(s_requests, numKeys, config.computeNR, threadNum, 1, dsm->getMyNodeID()); 
+
+  i_requests.clear();
+  i_requests.shrink_to_fit();
+
+  s_requests.clear();
+  s_requests.shrink_to_fit();
 
   LogWriter* lw = new LogWriter("COMPUTE");
-  lw->print_client_info(threadNum, cache_size*define::MB, workloadPath.c_str(), numBulkKeys, numInsertKeys, numKeys);
-  lw->LOG_client_info(threadNum, cache_size*define::MB, workloadPath.c_str(), numBulkKeys, numInsertKeys, numKeys);
+  lw->print_client_info(threadNum, cache_size*define::MB, workloadPath.c_str(), numBulkKeys, numKeys - numBulkKeys, numKeys);
+  lw->LOG_client_info(threadNum, cache_size*define::MB, workloadPath.c_str(), numBulkKeys, numKeys - numBulkKeys, numKeys);
 
   fprintf(stdout, "[NOTICE] Start initializing index structure\n");
   dsm->registerThread();
@@ -223,8 +237,8 @@ int main(int argc, char *argv[]) {
 
   if (dsm->getMyNodeID() == 0) {
     fprintf(stdout, "[NOTICE] Start bulk loading %lu keys\n", numBulkKeys);
-    for (size_t i = 0; i < b_keys.size(); ++i) {
-      tree->insert(b_keys[i], (Value)key2int(b_keys[i]));
+    for (uint64_t i = 0; i < bulk_requests.size(); ++i) {
+      tree->insert(bulk_requests[i].key, (Value)key2int(bulk_requests[i].key));
     }
   }
 
@@ -264,8 +278,8 @@ int main(int argc, char *argv[]) {
       search_time = search_time_list[i];
     }
 
-    insert_keys += rr_i_keys[i].size();
-    search_keys += rr_s_keys[i].size();
+    insert_keys += rr_i_requests[i].size();
+    search_keys += rr_s_requests[i].size();
     found_keys += found_keys_list[i];
   }
 
