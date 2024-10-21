@@ -90,7 +90,7 @@ void insert_func(Tree *tree, const Request& r, int tid, CoroContext *ctx = nullp
 
 void search_func(Tree *tree, const Request& r, int tid, CoroContext *ctx = nullptr, int coro_id = 0) {
   Value v;
-  auto ret = tree->search(r.key, v);
+  auto ret = tree->search(r.key, v, ctx, coro_id);
   if (ret && v == (Value)key2int(r.key)) {
     found_keys_list[tid]++;
   }
