@@ -215,8 +215,13 @@ int main(int argc, char *argv[]) {
 
   fprintf(stdout, "[NOTICE] Start multi client benchmark\n");
   dsm = DSM::getInstance(config);
-
+ 
+#ifdef USE_CORO
+  fprintf(stdout, "[NOTICE] Start dividing keys to %d threads (%u coroutine/thread)\n", threadNum, kCoroCnt);
+#else
   fprintf(stdout, "[NOTICE] Start dividing keys to %d threads (coroutine disabled)\n", threadNum);
+#endif
+
   KeyGenerator<Request, Value> key_gen;
   rr_i_requests = key_gen.gen_key_multi_client(i_requests, numKeys - numBulkKeys, config.computeNR, threadNum, 1, dsm->getMyNodeID());
   rr_s_requests = key_gen.gen_key_multi_client(s_requests, numKeys, config.computeNR, threadNum, 1, dsm->getMyNodeID()); 
