@@ -255,14 +255,14 @@ int main(int argc, char *argv[]) {
   fprintf(stdout, "[NOTICE] Start multi client benchmark\n");
   dsm = DSM::getInstance(config);
   
+  KeyGenerator<Request, Value> key_gen;
 #ifdef USE_CORO
   fprintf(stdout, "[NOTICE] Start dividing load keys to %d threads (%u coroutine/thread)\n", threadNum, kCoroCnt);
+  rr_load_requests = key_gen.gen_key_multi_client(load_requests, loadNumKeys - numBulkKeys, config.computeNR, threadNum, kCoroCnt, dsm->getMyNodeID());
 #else
   fprintf(stdout, "[NOTICE] Start dividing load keys to %d threads (coroutine disabled)\n", threadNum);
-#endif
-
-  KeyGenerator<Request, Value> key_gen;
   rr_load_requests = key_gen.gen_key_multi_client(load_requests, loadNumKeys - numBulkKeys, config.computeNR, threadNum, 1, dsm->getMyNodeID());
+#endif
 
   load_requests.clear();
   load_requests.shrink_to_fit();
@@ -310,11 +310,11 @@ int main(int argc, char *argv[]) {
    
 #ifdef USE_CORO
   fprintf(stdout, "[NOTICE] Start dividing txn keys to %d threads (%u coroutine/thread)\n", threadNum, kCoroCnt);
+  rr_txn_requests = key_gen.gen_key_multi_client(txn_requests, txnNumKeys, config.computeNR, threadNum, kCoroCnt, dsm->getMyNodeID());
 #else
   fprintf(stdout, "[NOTICE] Start dividing txn keys to %d threads (coroutine disabled)\n", threadNum);
-#endif
-
   rr_txn_requests = key_gen.gen_key_multi_client(txn_requests, txnNumKeys, config.computeNR, threadNum, 1, dsm->getMyNodeID());
+#endif
 
   txn_requests.clear();
   txn_requests.shrink_to_fit();
