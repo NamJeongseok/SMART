@@ -97,7 +97,7 @@ void txn_func(Tree *tree, const Request& r, int tid, CoroContext *ctx = nullptr,
     successed_requests_list[tid]++;
   } else if (r.op == OpType::SEARCH) {
     Value v;
-    auto ret = tree->search(r.key, v);
+    auto ret = tree->search(r.key, v, ctx, coro_id);
     if (ret && v == key2int(r.key)) {
       successed_requests_list[tid]++;
     }
