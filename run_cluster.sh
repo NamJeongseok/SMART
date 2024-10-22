@@ -21,8 +21,8 @@ WORKLOAD_DIR=/mnt/ssd/data
 WORKLOAD_NAME=("transposed_review_228M_8bit.csv" "transposed_map_m_8bit.csv")
 ######################################################################################
 
-computeNR=${#SERVER_IPS[@]}
-memoryNR=${#CLIENT_IPS[@]}
+computeNR=${#CLIENT_IPS[@]}
+memoryNR=${#SERVER_IPS[@]}
 script_path=${REPO_PATH}/SMART/script
 
 echo "[CAUTION] SSH public key registration is essential for successful connection"
