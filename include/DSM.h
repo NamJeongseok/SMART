@@ -181,7 +181,10 @@ public:
   }
 
   uint64_t get_key(const std::string &key) {
-    return std::stoull(keeper->memGet(key.c_str(), key.size()));
+    char* ret = keeper->memGet(key.c_str(), key.size());
+    uint64_t val = std::stoull(ret);
+    std::free(ret);
+    return val;
   }
 
   /* JY: Added for logging purpose. */
